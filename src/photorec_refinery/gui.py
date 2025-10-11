@@ -13,8 +13,8 @@ Notes:
 import asyncio
 
 import toga
-from toga.style import Pack
 from toga.constants import GREEN
+from toga.style import Pack
 
 from ..photorec_refinery.app_state import AppState
 from ..photorec_refinery.file_utils import get_recup_dirs
@@ -23,14 +23,13 @@ from .gui_utils import shorten_path
 
 
 class PhotoRecCleanerApp(toga.App):
-    
     def startup(self):
         self.main_window = toga.MainWindow(title=self.formal_name)
         self.app_state = AppState()
         self.controller = AppController(self, self.app_state)
 
         self.build_ui()
-        
+
         # Set initial state of controls now that they all exist.
         self.toggle_log_path(self.log_switch)
         self._update_start_button_state()
@@ -42,28 +41,46 @@ class PhotoRecCleanerApp(toga.App):
         self.main_window.show()
 
     def build_ui(self):
-        #load logo
-        photorec_cleaner_logo = toga.Image("resources/WarpedWingLabsLogo_Horizontal_Compressed_W500_blur.png")
+        # load logo
+        photorec_cleaner_logo = toga.Image(
+            "resources/WarpedWingLabsLogo_Horizontal_Compressed_W500_blur.png"
+        )
 
         header_box = toga.Box(style=Pack(direction="row", margin=5, flex=1))
-        header_box.add(toga.ImageView(photorec_cleaner_logo, height=75, margin_bottom=10))
+        header_box.add(
+            toga.ImageView(photorec_cleaner_logo, height=75, margin_bottom=10)
+        )
 
-        
-        label1 = toga.Label('1. Select the PhotoRec output directory.')
-        label2 = toga.Label('2. Configure options as needed.')
-        label3 = toga.Label('3. Click "Start Live Monitoring" to begin cleaning as files are recovered.')
-        label4 = toga.Label('4. Click "Finalize" when PhotoRec is finished to stop monitoring and see a summary.')
-        label5 = toga.Label('5. Alternatively, click "Process Now" to clean an existing PhotoRec output folder.')
-        content = toga.Box(children=[label1, label2, label3, label4, label5], style=Pack(direction='column'))
+        label1 = toga.Label("1. Select the PhotoRec output directory.")
+        label2 = toga.Label("2. Configure options as needed.")
+        label3 = toga.Label(
+            '3. Click "Start Live Monitoring" to begin cleaning as files are recovered.'
+        )
+        label4 = toga.Label(
+            '4. Click "Finalize" when PhotoRec is finished to stop monitoring and see a summary.'
+        )
+        label5 = toga.Label(
+            '5. Alternatively, click "Process Now" to clean an existing PhotoRec output folder.'
+        )
+        content = toga.Box(
+            children=[label1, label2, label3, label4, label5],
+            style=Pack(direction="column"),
+        )
 
         container = toga.ScrollContainer(content=content, flex=1)
         header_box.add(container)
-        
-        main_box = toga.Box(style=Pack(direction="column", margin_bottom=15, margin_left=10, margin_right=10, flex=1))
+
+        main_box = toga.Box(
+            style=Pack(
+                direction="column",
+                margin_bottom=15,
+                margin_left=10,
+                margin_right=10,
+                flex=1,
+            )
+        )
         main_box.add(header_box)
         main_box.add(toga.Divider(margin_bottom=10))
-        
-
 
         # Directory selection
         dir_box = toga.Box(style=Pack(margin_bottom=10))
@@ -125,9 +142,9 @@ class PhotoRecCleanerApp(toga.App):
         # Reorganization controls
         reorg_box = toga.Box(style=Pack(margin_bottom=10))
         self.reorg_switch = toga.Switch(
-            "Reorganize Files", 
+            "Reorganize Files",
             on_change=self._update_start_button_state,
-            style=Pack(margin_right=10)
+            style=Pack(margin_right=10),
         )
         batch_label = toga.Label(
             "Batch Size:", style=Pack(margin_left=10, margin_right=10)
@@ -175,17 +192,19 @@ class PhotoRecCleanerApp(toga.App):
 
         # Progress bar
         self.progress_bar = toga.ProgressBar(max=100, value=0)
-        self.progress_bar.style.visibility = 'hidden'
+        self.progress_bar.style.visibility = "hidden"
         main_box.add(self.progress_bar)
 
         self.activity_indicator = toga.ActivityIndicator()
-        self.activity_indicator.style.visibility = 'hidden'
+        self.activity_indicator.style.visibility = "hidden"
         main_box.add(self.activity_indicator)
 
         main_box.add(toga.Divider(margin_top=20, margin_bottom=10))
 
         # Status area (one label)
-        status_box = toga.Box(style=Pack(direction="column", margin_left=7, margin_right=7), flex=2)
+        status_box = toga.Box(
+            style=Pack(direction="column", margin_left=7, margin_right=7), flex=2
+        )
         self.guidance_label = toga.Label(
             "", style=Pack(text_align="center", font_style="italic", margin_bottom=5)
         )
@@ -321,7 +340,9 @@ class PhotoRecCleanerApp(toga.App):
     def start_monitoring_handler(self, widget):
         self.clean_now_button.enabled = False
         self.finish_button.enabled = True
-        self.guidance_label.text = "Live monitoring started. Click 'Finalize' when PhotoRec is finished."
+        self.guidance_label.text = (
+            "Live monitoring started. Click 'Finalize' when PhotoRec is finished."
+        )
         self.status_label.text = "Monitoring..."  # Set initial status immediately
         self.controller.start_monitoring()
 
@@ -355,10 +376,16 @@ class PhotoRecCleanerApp(toga.App):
         self.status_label.text = shorten_path(message, maxlen=120)
 
     def update_tally(self):
-        self.folders_processed_label.text = f"Folders Processed: {len(self.app_state.cleaned_folders)}"
+        self.folders_processed_label.text = (
+            f"Folders Processed: {len(self.app_state.cleaned_folders)}"
+        )
         self.files_kept_label.text = f"Files Kept: {self.app_state.total_kept_count}"
-        self.files_deleted_label.text = f"Files Deleted: {self.app_state.total_deleted_count}"
-        self.space_saved_label.text = f"Space Saved: {self._format_size(self.app_state.total_deleted_size)}"
+        self.files_deleted_label.text = (
+            f"Files Deleted: {self.app_state.total_deleted_count}"
+        )
+        self.space_saved_label.text = (
+            f"Space Saved: {self._format_size(self.app_state.total_deleted_size)}"
+        )
 
     def _format_size(self, size_bytes: int) -> str:
         if size_bytes < 1024:

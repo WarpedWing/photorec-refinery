@@ -10,7 +10,7 @@ results rather than mutating UI objects directly.
 
 import os
 import time
-from typing import Dict,  Optional
+from typing import Dict, Optional
 
 from .app_state import AppState
 from .file_utils import clean_folder, get_recup_dirs

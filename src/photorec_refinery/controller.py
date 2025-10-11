@@ -13,7 +13,11 @@ from datetime import datetime
 from typing import Optional, TYPE_CHECKING
 
 from ..photorec_refinery.app_state import AppState
-from ..photorec_refinery.file_utils import clean_folder, get_recup_dirs, organize_by_type
+from ..photorec_refinery.file_utils import (
+    clean_folder,
+    get_recup_dirs,
+    organize_by_type,
+)
 from ..photorec_refinery.photorec_refinery import Cleaner
 from .gui_utils import shorten_path
 
@@ -149,7 +153,7 @@ class AppController:
         base_dir = self.app.dir_path_input.value
         if not base_dir:
             return
-        
+
         loop = asyncio.get_running_loop()
         await asyncio.to_thread(self._finish_processing_sync, base_dir, loop)
 

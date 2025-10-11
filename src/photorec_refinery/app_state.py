@@ -1,6 +1,7 @@
 """
 Application state container for PhotoRec Cleaner.
 """
+
 from dataclasses import dataclass, field
 from typing import Any, Union
 

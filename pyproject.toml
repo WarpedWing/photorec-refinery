@@ -7,10 +7,50 @@ name = "photorec-refinery"
 version = "0.2.0"
 description = "A tool to clean and organize PhotoRec output directories."
 requires-python = ">=3.8"
-dependencies = ["toga"]
+dependencies = [
+    "toga",
+]
 readme = "README.md"
 license = { text = "MIT" }
 
 [project.scripts]
 photorec-refinery = "photorec_refinery.photorec_refinery:main"
 photorec-refinery-gui = "photorec_refinery.gui:main"
+
+[tool.ruff]
+[tool.ruff.lint]
+select = [
+  "E",        
+  "F",        
+  "W",        
+  "I",        
+  "UP",       
+  "C4",       
+  "FA",       
+  "ISC",      
+  "ICN"
+]
+
+extend-select = [
+    "F",        
+    "W",        
+    "E",        
+    "I",        
+    "UP",       
+    "C4",       
+    "FA",       
+    "ISC",      
+    "ICN",      
+    "RET",      
+    "SIM",     
+    "TID",      
+    "TC",      
+    "PTH",      
+    "TD",      
+  "NPY"      
+]
+
+ignore = [
+    "B011",
+    "E501"
+]
