@@ -1,0 +1,16 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "photorec-refinery"
+version = "0.2.0"
+description = "A tool to clean and organize PhotoRec output directories."
+requires-python = ">=3.8"
+dependencies = ["toga"]
+readme = "README.md"
+license = { text = "MIT" }
+
+[project.scripts]
+photorec-refinery = "photorec_refinery.photorec_refinery:main"
+photorec-refinery-gui = "photorec_refinery.gui:main"
