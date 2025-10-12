@@ -10,12 +10,13 @@ import contextlib
 import os
 import shutil
 from math import ceil
+from pathlib import Path
 
 
 class OperationCancelled(Exception):
     """Signal to abort the current operation immediately."""
+
     pass
-from pathlib import Path
 
 
 def clean_folder(

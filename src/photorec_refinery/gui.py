@@ -609,10 +609,15 @@ class PhotoRecCleanerApp(toga.App):
         report_body = (
             f"Photorec Cleaning Complete\n\n"
             f"Folders Processed: {len(self.app_state.cleaned_folders)}\n"
-            f"Files Kept: {self.app_state.total_kept_count}\n"
-            f"Files Deleted: {self.app_state.total_deleted_count}\n"
-            f"Total Space Saved: {self._format_size(self.app_state.total_deleted_size)}"
         )
+        if self.app_state.total_deleted_count > 0:
+            report_body += (
+                f"Files Kept: {self.app_state.total_kept_count}\n"
+                f"Files Deleted: {self.app_state.total_deleted_count}\n"
+                f"Total Space Saved: {self._format_size(self.app_state.total_deleted_size)}"
+            )
+        else:
+            report_body += f"Files Scanned: {self.app_state.total_kept_count}\n"
         asyncio.run_coroutine_threadsafe(
             self._show_dialog_async(report_title, report_body),
             asyncio.get_running_loop(),

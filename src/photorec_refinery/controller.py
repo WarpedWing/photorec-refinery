@@ -9,16 +9,17 @@ tasks, and updates the application state.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import csv
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from photorec_refinery.file_utils import (
+    OperationCancelled,
     clean_folder,
     get_recup_dirs,
     organize_by_type,
-    OperationCancelled,
 )
 from photorec_refinery.gui_utils import shorten_path
 from photorec_refinery.photorec_refinery import Cleaner
@@ -278,10 +279,8 @@ class AppController:
             return
         try:
             if not handle.closed:
-                try:
+                with contextlib.suppress(Exception):
                     handle.flush()
-                except Exception:
-                    pass
                 handle.close()
         except Exception:
             # Best-effort close; ignore races from concurrent cancellation
@@ -363,10 +362,8 @@ class AppController:
                 self.app._set_status_text_async(message), loop
             )
             batch_size = int(self.app.batch_size_input.value)
-            try:
+            with contextlib.suppress(OperationCancelled):
                 organize_by_type(base_dir, self.app_state, batch_size=batch_size)
-            except OperationCancelled:
-                pass
             message = "Reorganization complete."
             asyncio.run_coroutine_threadsafe(
                 self.app._set_status_text_async(message), loop
@@ -388,10 +385,8 @@ class AppController:
             loop,
         )
         # Write a summary CSV of the final results
-        try:
+        with contextlib.suppress(OSError):
             self._write_summary_csv(base_dir)
-        except OSError:
-            pass
 
         self._close_log_file()
 
@@ -443,7 +438,9 @@ class AppController:
     def _flush_status_update(self) -> None:
         """Runs on the event loop to apply the latest status update once."""
         try:
-            if not self.app_state.cancelled and not getattr(self.app, "drop_updates", False):
+            if not self.app_state.cancelled and not getattr(
+                self.app, "drop_updates", False
+            ):
                 self.app.update_status(self._last_status_msg)
         finally:
             self._status_update_scheduled = False
