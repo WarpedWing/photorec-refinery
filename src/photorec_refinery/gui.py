@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import webbrowser
 from pathlib import Path
 
 import toga
@@ -311,8 +312,8 @@ class PhotoRecCleanerApp(toga.App):
             self.help_window.show()
             return
 
+        heading = "How to Use PhotoRec Refinery"
         message = (
-            "How to Use PhotoRec Refinery\n\n"
             "1) Select the PhotoRec output directory. This is the folder that contains the generated recup_dir.* subfolders.\n\n"  # noqa: E501
             "2) Configure options as needed:\n"
             "   - Enable File Deletion: Permanently delete unwanted files.\n"
@@ -322,21 +323,47 @@ class PhotoRecCleanerApp(toga.App):
             "   - Reorganize Files: Reorganize files into folders named by filetype.\n"
             "   - Batch Size: The number of files you want in each subfolder.\n\n"
             "3) Live Monitoring: Click 'Live Monitor' to clean as PhotoRec recovers files.\n"
-            "   When PhotoRec is done, click 'Finalize'.\n\n"
+            "   - When PhotoRec is done, click 'Finalize'.\n\n"
             "4) Process: If you already have a completed PhotoRec output, click 'Process'.\n\n"
             "Need More Help?\n"
-            "- Email me at noel@warpedwinglabs.com\n"
-            "- https://github.com/WarpedWing.\n"
+            "- Click the buttons below to email me or visit my GitHub.\n"
+            "- noel@warpedwinglabs.com\n"
+            "- https://github.com/WarpedWing\n\n"
         )
 
         # Help text box
-        text_label = toga.Label(message, style=Pack(padding=10))
+        heading_label = toga.Label(
+            heading, style=Pack(padding=(10, 10), font_weight="bold", font_size=16)
+        )
+        text_label = toga.Label(message, style=Pack(padding=(0, 10)))
         content_box = toga.Box(style=Pack(direction="column", flex=1))
+        content_box.add(heading_label)
         content_box.add(text_label)
 
         scroll = toga.ScrollContainer(
             content=content_box, horizontal=False, vertical=True, style=Pack(flex=1)
         )
+
+        # Clickable links
+        def _open(url: str) -> None:
+            with contextlib.suppress(Exception):
+                webbrowser.open(url)
+
+        links_box = toga.Box(style=Pack(direction="row", padding=10))
+        email_btn = toga.Button(
+            "Email",
+            on_press=lambda w: _open(
+                "mailto:noel@warpedwinglabs.com?subject=PhotoRec%20Refinery%20Help"
+            ),
+            style=Pack(margin_right=10, height=28),
+        )
+        github_btn = toga.Button(
+            "GitHub",
+            on_press=lambda w: _open("https://github.com/WarpedWing/photorec-refinery"),
+            style=Pack(height=28),
+        )
+        links_box.add(email_btn)
+        links_box.add(github_btn)
 
         close_button = toga.Button(
             "Close",
@@ -346,6 +373,7 @@ class PhotoRecCleanerApp(toga.App):
 
         wrapper = toga.Box(style=Pack(direction="column", flex=1))
         wrapper.add(scroll)
+        wrapper.add(links_box)
         wrapper.add(close_button)
 
         self.help_window = toga.Window(
