@@ -39,6 +39,9 @@ class AppController:
         self.monitoring_task: asyncio.Task | None = None
         self.polling_task: asyncio.Task | None = None
         self._stop_monitoring = False
+        # Coalesce status updates to avoid UI backlog
+        self._last_status_msg: str = ""
+        self._status_update_scheduled: bool = False
 
     def set_cleaner(self, path: str):
         """Instantiates the Cleaner for a given directory."""
@@ -253,6 +256,13 @@ class AppController:
         if self.app_state.cancelled:
             return
 
+        # Write a summary CSV of the final results
+        try:
+            self._write_summary_csv(base_dir)
+        except OSError:
+            # Ignore write errors; UI already shows the summary dialog
+            pass
+
         self._close_log_file()
         steps_done += 1
         asyncio.run_coroutine_threadsafe(
@@ -377,6 +387,11 @@ class AppController:
             self.app._show_dialog_async("Processing Complete", report),
             loop,
         )
+        # Write a summary CSV of the final results
+        try:
+            self._write_summary_csv(base_dir)
+        except OSError:
+            pass
 
         self._close_log_file()
 
@@ -407,9 +422,69 @@ class AppController:
         self.app.status_label.text = "Processing cancelled."
 
     def _logger_callback(self, message: str):
-        """Callback from background threads to update UI with status."""
-        if not message or self.app_state.cancelled or getattr(self.app, "drop_updates", False):
+        """Callback from worker threads to update UI; coalesces messages."""
+        if (
+            not message
+            or self.app_state.cancelled
+            or getattr(self.app, "drop_updates", False)
+        ):
             return
 
-        # Pass all messages to the status label
-        self.loop.call_soon_threadsafe(self.app.update_status, message)
+        # Ignore noisy per-file messages; keep high-level progress only
+        if message.startswith("Kept:") or message.startswith("Deleted:"):
+            return
+
+        # Coalesce to the latest message and schedule a single UI update
+        self._last_status_msg = message
+        if not self._status_update_scheduled:
+            self._status_update_scheduled = True
+            self.loop.call_soon_threadsafe(self._flush_status_update)
+
+    def _flush_status_update(self) -> None:
+        """Runs on the event loop to apply the latest status update once."""
+        try:
+            if not self.app_state.cancelled and not getattr(self.app, "drop_updates", False):
+                self.app.update_status(self._last_status_msg)
+        finally:
+            self._status_update_scheduled = False
+
+    # --- Summary CSV writing ---
+    def _write_summary_csv(self, base_dir: str) -> None:
+        """Writes a compact CSV with final summary metrics.
+
+        Saves to the log folder if logging is enabled; otherwise to the
+        selected PhotoRec directory.
+        """
+        # Decide output directory
+        if self.app.log_switch.value and self.app.log_path_input.value:
+            out_dir = Path(self.app.log_path_input.value)
+        else:
+            out_dir = Path(base_dir)
+
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        outfile = out_dir / f"photorec_refinery_summary_{ts}.csv"
+
+        # Prepare a single-row CSV with fixed columns
+        headers = [
+            "timestamp",
+            "base_dir",
+            "folders_processed",
+            "files_kept",
+            "files_deleted",
+            "total_space_saved_bytes",
+        ]
+        row = [
+            ts,
+            str(base_dir),
+            len(self.app_state.cleaned_folders),
+            self.app_state.total_kept_count,
+            self.app_state.total_deleted_count,
+            self.app_state.total_deleted_size,
+        ]
+
+        with outfile.open("w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(headers)
+            writer.writerow(row)
