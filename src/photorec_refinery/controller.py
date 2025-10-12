@@ -257,11 +257,8 @@ class AppController:
             return
 
         # Write a summary CSV of the final results
-        try:
+        with contextlib.suppress(OSError):
             self._write_summary_csv(base_dir)
-        except OSError:
-            # Ignore write errors; UI already shows the summary dialog
-            pass
 
         self._close_log_file()
         steps_done += 1

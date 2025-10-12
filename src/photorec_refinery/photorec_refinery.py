@@ -14,7 +14,7 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict
 
-from .file_utils import clean_folder, get_recup_dirs, OperationCancelled
+from .file_utils import OperationCancelled, clean_folder, get_recup_dirs
 
 if TYPE_CHECKING:
     from collections.abc import Callable

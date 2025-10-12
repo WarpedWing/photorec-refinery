@@ -385,7 +385,7 @@ class PhotoRecCleanerApp(toga.App):
             self.help_window = None
             return True
 
-        self.help_window.on_close = _on_close
+        self.help_window.on_close = _on_close  # type: ignore[attr-defined]
         self.help_window.show()
 
     def _set_initial_cleaning_controls_state(self) -> None:
