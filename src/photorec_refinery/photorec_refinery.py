@@ -1,11 +1,6 @@
 """
 Cleaner core logic. Exposes a Cleaner class with a run_once() method
-that performs one pass of scanning/cleaning. This keeps the long-running
-work out of the event loop; gui.py will call run_once via asyncio.to_thread.
-
-
-This module deliberately keeps side effects minimal: it returns structured
-results rather than mutating UI objects directly.
+that performs one pass of scanning/cleaning.
 """
 
 from __future__ import annotations

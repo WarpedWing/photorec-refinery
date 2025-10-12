@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import webbrowser
+from pathlib import Path
 
 import toga
 from toga.constants import GREEN
@@ -693,10 +694,14 @@ class PhotoRecCleanerApp(toga.App):
 
 
 def main() -> None:
+    # Determine the icon path - Briefcase packages the icon in resources
+    icon_path = Path(__file__).parent / "resources" / "photorec-refinery"
+
     app = PhotoRecCleanerApp(
         formal_name="PhotoRec Refinery",
         app_id="org.beeware.photorec_refinery",
         app_name="photorec-refinery",
+        icon=str(icon_path),
     )
     app.main_loop()
 

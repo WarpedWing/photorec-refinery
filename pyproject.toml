@@ -10,7 +10,6 @@ readme = "README.md"
 license = { file = "LICENSE" }
 
 [project.scripts]
-photorec-refinery = "photorec_refinery.photorec_refinery:main"
 photorec-refinery-gui = "photorec_refinery.gui:main"
 
 [tool.ruff]
@@ -60,7 +59,7 @@ dev = [
 project_name = "PhotoRec Refinery"
 bundle = "com.photorec-refinery"
 version = "0.5.0"
-url = "https://github.com/yourusername/photorec-refinery"
+url = "https://github.com/WarpedWing/photorec-refinery"
 author = "WarpedWing Labs"
 author_email = "noel@warpedwinglabs.com"
 
@@ -70,7 +69,7 @@ description = "A tool to clean and organize PhotoRec output directories"
 long_description = """A GUI application to intelligently organize files recovered by PhotoRec.
 It actively monitors the PhotoRec output directory and deletes unwanted file types from
 completed recup_dir.X folders in real-time."""
-icon = "resources/photorec-refinery"
+icon = "src/photorec_refinery/resources/photorec-refinery"
 sources = ["src/photorec_refinery"]
 test_sources = ["tests"]
 
