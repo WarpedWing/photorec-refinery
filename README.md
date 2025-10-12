@@ -1,16 +1,24 @@
 # PhotoRec Refinery
 
+![PhotoRec Refinery - Main](https://github.com/WarpedWing/WarpedWing/blob/main/refinery-mainwindow.png)
+
 A desktop companion for [PhotoRec](https://www.cgsecurity.org/wiki/PhotoRec) that helps you auto-remove filetypes you don't want — and keep the carved files organized.
 
 - Live‑monitors PhotoRec’s output and automatically deletes unwanted types in completed `recup_dir.X` folders
 - One‑click “Process” for existing PhotoRec output that’s already finished
 - Optional reorganization into type‑based folders with configurable subfolder batch sizes
 
+| From This    | To This |
+| -------- | ------- |
+| ![PhotRec Refinery - Ugly Folders](https://github.com/WarpedWing/WarpedWing/blob/main/refinery-uglyfolders.png)  | ![PhotRec Refinery - Reorganized Folders](https://github.com/WarpedWing/WarpedWing/blob/main/refinery-cleanfolders.png)    |
+
 ## Why This Helps
 
 PhotoRec works best when it recovers everything it can. (Carving just a few filetypes results in corrupt or huge files.) But recovering all types can quickly fill your drive.
 
 For example, you might only want `.jpg,.png,.pdf`, but end up with gigabytes of `html.gz`, `xml.gz`, and tiny temp files. Or, you might only want system files, but end up with a drive's-worth of images.
+
+![PhotoRec Refinery - Outcome](https://github.com/WarpedWing/WarpedWing/blob/main/refinery-outputprompt.png)
 
 PhotoRec Refinery can get rid of the unwanted files as soon as they're written to disk, keeping total extraction size as small as possible for your specific needs.
 
@@ -20,6 +28,8 @@ PhotoRec Refinery can get rid of the unwanted files as soon as they're written t
 - **Flexible filtering** – Comma‑separated Keep and Exclude lists (e.g., `jpg,png,pdf`)
 - **Smart reorganization** – Move kept files into type‑named folders
 - **Detailed logging** – Per‑file CSV log (kept/deleted) plus a final summary CSV (bytes and GB saved)
+
+![PhotoRec Refinery - Log](https://github.com/WarpedWing/WarpedWing/blob/main/refinery-log.png)
 
 ## Installation
 
