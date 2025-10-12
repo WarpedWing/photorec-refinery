@@ -10,6 +10,11 @@ import contextlib
 import os
 import shutil
 from math import ceil
+
+
+class OperationCancelled(Exception):
+    """Signal to abort the current operation immediately."""
+    pass
 from pathlib import Path
 
 
@@ -38,11 +43,11 @@ def clean_folder(
 
     for root, _, files in os.walk(folder):
         if state.cancelled:
-            break
+            raise OperationCancelled()
         root_path = Path(root)
         for f in files:
             if state.cancelled:
-                break
+                raise OperationCancelled()
             files_processed += 1
             activity_message = f"{prefix} {folder_name} ({files_processed} files)"
             state.current_activity = activity_message
@@ -76,12 +81,16 @@ def clean_folder(
                         break
 
             if keep:
+                if state.cancelled:
+                    raise OperationCancelled()
                 state.total_kept_count += 1
                 state.kept_files.setdefault(primary_ext, []).append(str(path))
                 log_action(state, folder_name, f, primary_ext, "kept", str(path))
                 if logger:
                     logger(f"Kept: {f}")
             else:
+                if state.cancelled:
+                    raise OperationCancelled()
                 try:
                     size = path.stat().st_size
                     path.unlink()
@@ -111,7 +120,7 @@ def log_action(state, folder, filename, ext, status, path, size=None):
         size (int, optional): The file size. If not provided, it will be
             calculated. Defaults to None.
     """
-    if not state.log_writer:
+    if state.cancelled or not state.log_writer:
         return
 
     if size is None:
@@ -163,13 +172,15 @@ def organize_by_type(base_dir, state, batch_size=500):
             kept files.
         batch_size (int): The maximum number of files to place in any one subfolder.
     """
-    if not state.kept_files or state.cancelled:
+    if state.cancelled:
+        raise OperationCancelled()
+    if not state.kept_files:
         return
 
     base_path = Path(base_dir)
     for ext, paths in state.kept_files.items():
         if state.cancelled:
-            break
+            raise OperationCancelled()
         type_folder = base_path / ext
         type_folder.mkdir(exist_ok=True)
 
@@ -182,14 +193,14 @@ def organize_by_type(base_dir, state, batch_size=500):
             # If there's only one batch, move files directly to the type_folder
             for path in paths:
                 if state.cancelled:
-                    break
+                    raise OperationCancelled()
                 with contextlib.suppress(shutil.Error, OSError):
                     shutil.move(path, type_folder)
         else:
             # If multiple batches are needed, create subfolders
             for i, path in enumerate(paths):
                 if state.cancelled:
-                    break
+                    raise OperationCancelled()
                 batch_num = (i // batch_size) + 1
                 subfolder_name = str(batch_num)
                 subfolder = type_folder / subfolder_name
@@ -198,13 +209,13 @@ def organize_by_type(base_dir, state, batch_size=500):
                     shutil.move(path, subfolder)
 
     if state.cancelled:
-        return
+        raise OperationCancelled()
 
     # Clean up the now-empty recup_dir.* folders
     recup_dirs_to_delete = get_recup_dirs(base_dir)
     for folder in recup_dirs_to_delete:
         if state.cancelled:
-            break
+            raise OperationCancelled()
         with contextlib.suppress(OSError):
             shutil.rmtree(folder)
 

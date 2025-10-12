@@ -13,6 +13,7 @@ Notes:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from pathlib import Path
 
 import toga
@@ -51,6 +52,8 @@ class PhotoRecCleanerApp(toga.App):
     live_monitor_button: toga.Button
     process_button: toga.Button
     help_window: toga.Window | None
+    active_task: asyncio.Task | None
+    drop_updates: bool
 
     def startup(self) -> None:
         self.main_window = toga.MainWindow(
@@ -59,6 +62,8 @@ class PhotoRecCleanerApp(toga.App):
         self.app_state = AppState()
         self.controller = AppController(self, self.app_state)
         self.help_window = None
+        self.active_task = None
+        self.drop_updates = False
 
         self.build_ui()
 
@@ -432,6 +437,7 @@ class PhotoRecCleanerApp(toga.App):
         self.update_tally()
 
     def start_monitoring_handler(self, widget: toga.Button) -> None:
+        self.drop_updates = False
         self.process_button.text = "Finalize"
         self.process_button.enabled = True
         self.cancel_button.enabled = True
@@ -443,9 +449,28 @@ class PhotoRecCleanerApp(toga.App):
         self.controller.start_monitoring()
 
     def cancel_handler(self, widget: toga.Button) -> None:
-        """Immediately cancels all processing."""
-        self.controller.cancel()
+        """Cancel immediately; show 'Cancelling…' right away; then return."""
+        # Gate all further status/progress updates first, so nothing overwrites our message
+        self.drop_updates = True
+        self.status_label.text = "Cancelling..."
+        self.guidance_label.text = "Cancellation in progress — this may take a moment."
+        self.cancel_button.enabled = False
+        self.process_button.enabled = False
+        self.live_monitor_button.enabled = False
+        # UI will update immediately; cleanup runs in background
 
+        # Signal controller + workers to stop and close logs, then finalize asynchronously
+        self.controller.cancel()
+        asyncio.create_task(self._post_cancel_cleanup())
+
+    async def _post_cancel_cleanup(self) -> None:
+        """Wait for active work to stop, then reset UI and resume polling."""
+        if self.active_task and not self.active_task.done():
+            with contextlib.suppress(asyncio.CancelledError):
+                await self.active_task
+        self.active_task = None
+
+        # Stop indicators now that work has ceased
         self.activity_indicator.stop()
         self.activity_indicator.style.visibility = "hidden"
         self.progress_bar.style.visibility = "hidden"
@@ -453,16 +478,17 @@ class PhotoRecCleanerApp(toga.App):
         # Reset UI elements to their pre-monitoring state
         self.status_label.text = "Cancelled."
         self.guidance_label.text = ""
-        self.cancel_button.enabled = False
         self.process_button.text = "Process"
         self.process_button.enabled = False
         self._update_start_button_state()  # updates live_monitor_button
 
-        # Restart polling to check for existing folders to enable the "Process Now" button
+        # Restart polling to check for existing folders to enable the Process button
         self.controller.start_folder_polling()
 
     def _set_status_text_threadsafe(self, message: str) -> None:
         # Keep status concise to avoid layout thrashing
+        if self.drop_updates or self.app_state.cancelled:
+            return
         self.status_label.text = shorten_path(message, maxlen=120)
 
     def update_tally(self) -> None:
@@ -494,8 +520,11 @@ class PhotoRecCleanerApp(toga.App):
         self.progress_bar.style.visibility = "visible"
         self.activity_indicator.style.visibility = "visible"
         self.activity_indicator.start()
-
-        await self.controller.finish_processing()
+        try:
+            await self.controller.finish_processing()
+        except asyncio.CancelledError:
+            # Swallow cancellation; cancel handler handles UI teardown
+            return
 
         # --- Exit processing state ---
         self.activity_indicator.stop()
@@ -518,20 +547,29 @@ class PhotoRecCleanerApp(toga.App):
         self.app_state.reset()
         self.guidance_label.text = ""
         self.update_tally()
+        self.active_task = None
 
     async def clean_now_handler(self, widget: toga.Button | None = None) -> None:
         """Handler for the 'Clean Now' button to process existing folders."""
         # --- Enter processing state ---
+        self.drop_updates = False
         self.process_button.enabled = False
         self.live_monitor_button.enabled = False
         self.cancel_button.enabled = True
+
+        # Pause folder polling during one-shot processing to avoid UI races
+        self.controller.stop_folder_polling()
 
         self.progress_bar.value = 0
         self.progress_bar.style.visibility = "visible"
         self.activity_indicator.style.visibility = "visible"
         self.activity_indicator.start()
 
-        await self.controller.perform_one_shot_clean()
+        try:
+            await self.controller.perform_one_shot_clean()
+        except asyncio.CancelledError:
+            # Swallow cancellation; cancel handler handles UI teardown
+            return
 
         # --- Exit processing state (unconditionally) ---
         self.activity_indicator.stop()
@@ -548,6 +586,10 @@ class PhotoRecCleanerApp(toga.App):
         self.app_state.reset()
         self.guidance_label.text = ""
         self.update_tally()
+        self.active_task = None
+
+        # Resume polling to reflect current folder state
+        self.controller.start_folder_polling()
 
     def _process_or_finalize_handler(self, widget: toga.Button) -> None:
         """Decide whether to process immediately or finalize monitoring."""
@@ -557,10 +599,10 @@ class PhotoRecCleanerApp(toga.App):
         )
         if monitoring_active:
             # Run finalize path
-            asyncio.create_task(self.finish_handler(None))
+            self.active_task = asyncio.create_task(self.finish_handler(None))
         else:
             # Run one-shot processing path
-            asyncio.create_task(self.clean_now_handler(None))
+            self.active_task = asyncio.create_task(self.clean_now_handler(None))
 
     def _show_final_report(self) -> None:
         report_title = "Processing Complete"
@@ -577,6 +619,8 @@ class PhotoRecCleanerApp(toga.App):
         )
 
     def update_progress(self, value: int, max_value: int) -> None:
+        if self.drop_updates or self.app_state.cancelled:
+            return
         self.progress_bar.max = max_value
         self.progress_bar.value = value
 
@@ -585,14 +629,20 @@ class PhotoRecCleanerApp(toga.App):
 
     def update_status(self, message: str) -> None:
         # called from file_utils cleaners which might run in the main thread
+        if self.drop_updates or self.app_state.cancelled:
+            return
         self.status_label.text = shorten_path(message, maxlen=120)
 
     async def _update_tally_async(self) -> None:
         """Async version of update_tally to be called from other threads."""
+        if self.drop_updates or self.app_state.cancelled:
+            return
         self.update_tally()
 
     async def _set_status_text_async(self, message: str) -> None:
         """Async version of setting status text to be called from other threads."""
+        if self.drop_updates or self.app_state.cancelled:
+            return
         self.status_label.text = shorten_path(message, maxlen=120)
 
     async def _show_dialog_async(self, title: str, message: str) -> None:

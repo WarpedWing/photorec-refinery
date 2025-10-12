@@ -18,6 +18,7 @@ from photorec_refinery.file_utils import (
     clean_folder,
     get_recup_dirs,
     organize_by_type,
+    OperationCancelled,
 )
 from photorec_refinery.gui_utils import shorten_path
 from photorec_refinery.photorec_refinery import Cleaner
@@ -50,8 +51,13 @@ class AppController:
 
         self.polling_task = asyncio.create_task(self._poll_for_folders())
 
+    def stop_folder_polling(self):
+        """Stops the folder polling task if running."""
+        if self.polling_task and not self.polling_task.done():
+            self.polling_task.cancel()
+
     async def _poll_for_folders(self):
-        """Periodically checks for recup_dir folders to enable the Process Now button."""
+        """Periodically checks for recup_dir folders to enable the Process button."""
         base_dir = self.app.dir_path_input.value
         if not base_dir:
             return
@@ -206,13 +212,16 @@ class AppController:
                 exclude_ext = {
                     ext.strip() for ext in exclude_ext_str.split(",") if ext.strip()
                 }
-                clean_folder(
-                    last_folder,
-                    self.app_state,
-                    keep_ext=keep_ext,
-                    exclude_ext=exclude_ext,
-                    logger=self._logger_callback,
-                )
+                try:
+                    clean_folder(
+                        last_folder,
+                        self.app_state,
+                        keep_ext=keep_ext,
+                        exclude_ext=exclude_ext,
+                        logger=self._logger_callback,
+                    )
+                except OperationCancelled:
+                    return
                 self.app_state.cleaned_folders.add(last_folder)
                 asyncio.run_coroutine_threadsafe(self.app._update_tally_async(), loop)
                 steps_done += 1
@@ -228,7 +237,10 @@ class AppController:
                 self.app._set_status_text_async(message), loop
             )
             batch_size = int(self.app.batch_size_input.value)
-            organize_by_type(base_dir, self.app_state, batch_size=batch_size)
+            try:
+                organize_by_type(base_dir, self.app_state, batch_size=batch_size)
+            except OperationCancelled:
+                return
             message = "Reorganization complete."
             asyncio.run_coroutine_threadsafe(
                 self.app._set_status_text_async(message), loop
@@ -249,8 +261,22 @@ class AppController:
 
     def _close_log_file(self) -> None:
         """Closes the log file handle if it's open."""
-        if self.app_state.log_file_handle is not None:
-            self.app_state.log_file_handle.close()
+        handle = self.app_state.log_file_handle
+        if handle is None:
+            self.app_state.log_writer = None
+            self.app_state.log_file_handle = None
+            return
+        try:
+            if not handle.closed:
+                try:
+                    handle.flush()
+                except Exception:
+                    pass
+                handle.close()
+        except Exception:
+            # Best-effort close; ignore races from concurrent cancellation
+            pass
+        finally:
             self.app_state.log_writer = None
             self.app_state.log_file_handle = None
 
@@ -300,14 +326,17 @@ class AppController:
             asyncio.run_coroutine_threadsafe(
                 self.app._set_status_text_async(message), loop
             )
-            clean_folder(
-                folder,
-                self.app_state,
-                keep_ext=keep_ext,
-                exclude_ext=exclude_ext,
-                logger=self._logger_callback,
-                prefix="Processing",
-            )
+            try:
+                clean_folder(
+                    folder,
+                    self.app_state,
+                    keep_ext=keep_ext,
+                    exclude_ext=exclude_ext,
+                    logger=self._logger_callback,
+                    prefix="Processing",
+                )
+            except OperationCancelled:
+                break
             self.app_state.cleaned_folders.add(folder)
             asyncio.run_coroutine_threadsafe(self.app._update_tally_async(), loop)
             asyncio.run_coroutine_threadsafe(
@@ -324,7 +353,10 @@ class AppController:
                 self.app._set_status_text_async(message), loop
             )
             batch_size = int(self.app.batch_size_input.value)
-            organize_by_type(base_dir, self.app_state, batch_size=batch_size)
+            try:
+                organize_by_type(base_dir, self.app_state, batch_size=batch_size)
+            except OperationCancelled:
+                pass
             message = "Reorganization complete."
             asyncio.run_coroutine_threadsafe(
                 self.app._set_status_text_async(message), loop
@@ -369,11 +401,14 @@ class AppController:
         if self.polling_task and not self.polling_task.done():
             self.polling_task.cancel()
 
+        # Close log file immediately so no further writes occur
+        self._close_log_file()
+
         self.app.status_label.text = "Processing cancelled."
 
     def _logger_callback(self, message: str):
         """Callback from background threads to update UI with status."""
-        if not message:
+        if not message or self.app_state.cancelled or getattr(self.app, "drop_updates", False):
             return
 
         # Pass all messages to the status label

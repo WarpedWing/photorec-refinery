@@ -14,7 +14,7 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict
 
-from .file_utils import clean_folder, get_recup_dirs
+from .file_utils import clean_folder, get_recup_dirs, OperationCancelled
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -68,24 +68,29 @@ class Cleaner:
 
         # Process fully completed folders (safe to clean/delete)
         for folder in folders_to_process:
+            if app_state.cancelled:
+                raise OperationCancelled()
             if logger:
                 logger(f"Processing {folder}")
             # perform actual cleaning -> this updates app_state counters
-            clean_folder(
-                folder,
-                app_state,
-                keep_ext=keep_ext,
-                exclude_ext=exclude_ext,
-                logger=logger,
-                prefix="Processing",
-            )
+            try:
+                clean_folder(
+                    folder,
+                    app_state,
+                    keep_ext=keep_ext,
+                    exclude_ext=exclude_ext,
+                    logger=logger,
+                    prefix="Processing",
+                )
+            except OperationCancelled:
+                raise
             # mark it as cleaned so we don't reprocess
             app_state.cleaned_folders.add(folder)
             processed.append(folder)
 
         # For live feedback, simply log the name of the active folder.
         # The controller loop handles the "Monitoring..." status if no folders exist.
-        if active_folder and logger:
+        if active_folder and logger and not app_state.cancelled:
             logger(f"Processing folder: {Path(active_folder).name}")
 
         return {
