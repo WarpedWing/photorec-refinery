@@ -1,7 +1,3 @@
-#[build-system]
-#requires = ["hatchling"]
-#build-backend = "hatchling.build"
-
 [project]
 name = "photorec-refinery"
 version = "0.5.0"
@@ -11,7 +7,7 @@ dependencies = [
     "toga",
 ]
 readme = "README.md"
-license = { text = "MIT" }
+license = { file = "LICENSE" }
 
 [project.scripts]
 photorec-refinery = "photorec_refinery.photorec_refinery:main"
@@ -57,5 +53,46 @@ ignore = [
 
 [dependency-groups]
 dev = [
-    "ruff>=0.14.0",
+    "briefcase>=0.3.19",
 ]
+
+[tool.briefcase]
+project_name = "PhotoRec Refinery"
+bundle = "com.photorec-refinery"
+version = "0.5.0"
+url = "https://github.com/yourusername/photorec-refinery"
+author = "WarpedWing Labs"
+author_email = "noel@warpedwinglabs.com"
+
+[tool.briefcase.app.photorec-refinery]
+formal_name = "PhotoRec Refinery"
+description = "A tool to clean and organize PhotoRec output directories"
+long_description = """A GUI application to intelligently organize files recovered by PhotoRec.
+It actively monitors the PhotoRec output directory and deletes unwanted file types from
+completed recup_dir.X folders in real-time."""
+icon = "resources/photorec-refinery"
+sources = ["src/photorec_refinery"]
+test_sources = ["tests"]
+
+# Entry point for the GUI application
+startup_module = "photorec_refinery.gui"
+
+requires = [
+    "toga>=0.4.0",
+]
+
+[tool.briefcase.app.photorec-refinery.macOS]
+requires = [
+    "toga-cocoa>=0.4.0",
+]
+
+[tool.briefcase.app.photorec-refinery.linux]
+requires = [
+    "toga-gtk>=0.4.0",
+]
+
+[tool.briefcase.app.photorec-refinery.windows]
+requires = [
+    "toga-winforms>=0.4.0",
+]
+system_installer = true

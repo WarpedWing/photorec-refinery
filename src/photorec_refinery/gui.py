@@ -8,7 +8,6 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import webbrowser
-from pathlib import Path
 
 import toga
 from toga.constants import GREEN
@@ -694,20 +693,10 @@ class PhotoRecCleanerApp(toga.App):
 
 
 def main() -> None:
-    print("--- Entering main function ---")
-    # app icon path must be absolute to be found reliably
-    # Explicitly add the .icns extension for macOS
-    icon_path = Path(__file__).parent / "resources"
-
-    # --- DEBUGGING: Check if the path is correct and the file exists ---
-    print(f"Attempting to load icon from absolute path: {icon_path}")
-    print(f"Does icon file exist? {Path.exists(icon_path)}")
-    # --- END DEBUGGING ---
     app = PhotoRecCleanerApp(
         formal_name="PhotoRec Refinery",
         app_id="org.beeware.photorec_refinery",
-        app_name="photorec_refinery",
-        icon=str(icon_path),
+        app_name="photorec-refinery",
     )
     app.main_loop()
 
