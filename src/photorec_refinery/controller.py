@@ -60,7 +60,7 @@ class AppController:
             # Only poll if monitoring is NOT active
             if not self.monitoring_task or self.monitoring_task.done():
                 recup_dirs = await asyncio.to_thread(get_recup_dirs, base_dir)
-                self.app.clean_now_button.enabled = bool(recup_dirs)
+                self.app.process_button.enabled = bool(recup_dirs)
             await asyncio.sleep(2)  # Poll every 2 seconds
 
     def start_monitoring(self):

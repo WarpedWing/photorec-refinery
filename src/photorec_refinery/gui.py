@@ -47,9 +47,9 @@ class PhotoRecCleanerApp(toga.App):
     activity_indicator: toga.ActivityIndicator
     guidance_label: toga.Label
     status_label: toga.Label
-    clean_now_button: toga.Button
-    start_button: toga.Button
-    finish_button: toga.Button
+    cancel_button: toga.Button
+    live_monitor_button: toga.Button
+    process_button: toga.Button
     help_window: toga.Window | None
 
     def startup(self) -> None:
@@ -216,15 +216,16 @@ class PhotoRecCleanerApp(toga.App):
         self.progress_bar.style.visibility = "hidden"
         main_box.add(self.progress_bar)
 
-        self.activity_indicator = toga.ActivityIndicator()
-        self.activity_indicator.style.visibility = "hidden"
-        main_box.add(self.activity_indicator)
-
         main_box.add(toga.Divider(margin_top=20, margin_bottom=10))
 
         # Status area (one label)
         status_box = toga.Box(
-            style=Pack(direction="column", margin_left=7, margin_right=7), flex=2
+            style=Pack(
+                direction="column",
+                margin_left=7,
+                margin_right=7,
+                flex=1,
+            )
         )
         self.guidance_label = toga.Label(
             "", style=Pack(text_align="center", font_style="italic", margin_bottom=5)
@@ -241,6 +242,21 @@ class PhotoRecCleanerApp(toga.App):
 
         status_box.add(self.status_label)
 
+        # activity spinner
+        self.activity_indicator = toga.ActivityIndicator()
+        self.activity_indicator.style.visibility = "hidden"
+        spinner_box = toga.Box(
+            style=Pack(
+                flex=1,
+                direction="column",
+                justify_content="center",
+                align_items="center",
+                margin=5,
+            )
+        )
+        spinner_box.add(self.activity_indicator)
+        status_box.add(spinner_box)
+
         scroll_container = toga.ScrollContainer(
             content=status_box, horizontal=False, vertical=True
         )
@@ -252,9 +268,9 @@ class PhotoRecCleanerApp(toga.App):
         action_box = toga.Box(
             style=Pack(margin_top=10, flex=1, align_items="end", margin_bottom=10)
         )
-        self.clean_now_button = toga.Button(
-            "Process Now",
-            on_press=self.clean_now_handler,
+        self.cancel_button = toga.Button(
+            "Cancel",
+            on_press=self.cancel_handler,
             enabled=False,
             flex=1,
             margin=5,
@@ -262,8 +278,8 @@ class PhotoRecCleanerApp(toga.App):
             font_size=10,
             height=30,
         )
-        self.start_button = toga.Button(
-            "Start Live Monitoring",
+        self.live_monitor_button = toga.Button(
+            "Live Monitor",
             on_press=self.start_monitoring_handler,
             enabled=False,
             flex=1,
@@ -272,9 +288,9 @@ class PhotoRecCleanerApp(toga.App):
             font_size=10,
             height=30,
         )
-        self.finish_button = toga.Button(
-            "Finalize",
-            on_press=self.finish_handler,
+        self.process_button = toga.Button(
+            "Process",
+            on_press=self._process_or_finalize_handler,
             enabled=False,
             flex=1,
             margin=5,
@@ -282,9 +298,9 @@ class PhotoRecCleanerApp(toga.App):
             font_size=10,
             height=30,
         )
-        action_box.add(self.clean_now_button)
-        action_box.add(self.start_button)
-        action_box.add(self.finish_button)
+        action_box.add(self.cancel_button)
+        action_box.add(self.live_monitor_button)
+        action_box.add(self.process_button)
         main_box.add(action_box)
 
         self.main_box = main_box
@@ -305,8 +321,8 @@ class PhotoRecCleanerApp(toga.App):
             "   - Exclude (csv): Extensions to never keep even if they match keep (e.g., html.gz, xml.gz).\n"
             "   - Enable Logging: Write an audit log of actions.\n"
             "   - Reorganize Files: Optionally regroup files into batches for ease of review.\n\n"
-            "3) Live Monitoring: Click 'Start Live Monitoring' to clean as PhotoRec recovers files. When PhotoRec is done, click 'Finalize' to stop monitoring and see a summary.\n\n"  # noqa: E501
-            "4) One‑Shot: If you already have a completed PhotoRec output, click 'Process Now' to clean it immediately.\n\n"  # noqa: E501
+            "3) Live Monitoring: Click 'Live Monitor' to clean as PhotoRec recovers files. When PhotoRec is done, click 'Finalize' to stop monitoring and see a summary.\n\n"  # noqa: E501
+            "4) One‑Shot: If you already have a completed PhotoRec output, click 'Process' to clean it immediately.\n\n"  # noqa: E501
             "Notes:\n"
             "- Deletions are permanent. Review your 'Keep' and 'Exclude' lists carefully.\n"
             "- Status shows the last action; the running tally tracks overall progress.\n"
@@ -356,7 +372,9 @@ class PhotoRecCleanerApp(toga.App):
             or self.log_switch.value
             or self.reorg_switch.value
         )
-        self.start_button.enabled = is_directory_selected and is_any_option_selected
+        self.live_monitor_button.enabled = (
+            is_directory_selected and is_any_option_selected
+        )
 
     async def toggle_cleaning_controls(self, widget: toga.Switch) -> None:
         if widget.value:
@@ -414,17 +432,15 @@ class PhotoRecCleanerApp(toga.App):
         self.update_tally()
 
     def start_monitoring_handler(self, widget: toga.Button) -> None:
-        self.clean_now_button.enabled = False
-        self.finish_button.enabled = True
+        self.process_button.text = "Finalize"
+        self.process_button.enabled = True
+        self.cancel_button.enabled = True
+        self.live_monitor_button.enabled = False
         self.guidance_label.text = (
             "Live monitoring started. Click 'Finalize' when PhotoRec is finished."
         )
         self.status_label.text = "Monitoring..."  # Set initial status immediately
         self.controller.start_monitoring()
-
-        # Change button to Cancel
-        self.start_button.text = "Cancel"
-        self.start_button.on_press = self.cancel_handler
 
     def cancel_handler(self, widget: toga.Button) -> None:
         """Immediately cancels all processing."""
@@ -437,12 +453,10 @@ class PhotoRecCleanerApp(toga.App):
         # Reset UI elements to their pre-monitoring state
         self.status_label.text = "Cancelled."
         self.guidance_label.text = ""
-        self.finish_button.enabled = False
-
-        # Reset start button
-        self.start_button.text = "Start Live Monitoring"
-        self.start_button.on_press = self.start_monitoring_handler
-        self._update_start_button_state()
+        self.cancel_button.enabled = False
+        self.process_button.text = "Process"
+        self.process_button.enabled = False
+        self._update_start_button_state()  # updates live_monitor_button
 
         # Restart polling to check for existing folders to enable the "Process Now" button
         self.controller.start_folder_polling()
@@ -472,9 +486,9 @@ class PhotoRecCleanerApp(toga.App):
             return f"{size_bytes / 1024**2:.1f} MB"
         return f"{size_bytes / 1024**3:.1f} GB"
 
-    async def finish_handler(self, widget: toga.Button) -> None:
-        self.finish_button.enabled = False
-        self.clean_now_button.enabled = False
+    async def finish_handler(self, widget: toga.Button | None = None) -> None:
+        self.process_button.enabled = False
+        self.live_monitor_button.enabled = False
 
         self.progress_bar.value = 0
         self.progress_bar.style.visibility = "visible"
@@ -495,26 +509,22 @@ class PhotoRecCleanerApp(toga.App):
         # get_recup_dirs can be slow, run it in a thread
         base_dir = self.dir_path_input.value
         recup_dirs = await asyncio.to_thread(get_recup_dirs, base_dir)
-        self.clean_now_button.enabled = bool(recup_dirs)
+        self.process_button.enabled = bool(recup_dirs)
 
-        # Reset start button
-        self.start_button.text = "Start Live Monitoring"
-        self.start_button.on_press = self.start_monitoring_handler
-        self._update_start_button_state()  # This will set the enabled state correctly
-
-        self.finish_button.enabled = False
+        # Reset buttons
+        self.process_button.text = "Process"
+        self._update_start_button_state()  # enable Live Monitor if allowed
+        self.cancel_button.enabled = False
         self.app_state.reset()
         self.guidance_label.text = ""
         self.update_tally()
 
-    async def clean_now_handler(self, widget: toga.Button) -> None:
+    async def clean_now_handler(self, widget: toga.Button | None = None) -> None:
         """Handler for the 'Clean Now' button to process existing folders."""
         # --- Enter processing state ---
-        self.clean_now_button.enabled = False
-        self.finish_button.enabled = False
-        self.start_button.text = "Cancel"
-        self.start_button.on_press = self.cancel_handler
-        self.start_button.enabled = True
+        self.process_button.enabled = False
+        self.live_monitor_button.enabled = False
+        self.cancel_button.enabled = True
 
         self.progress_bar.value = 0
         self.progress_bar.style.visibility = "visible"
@@ -528,17 +538,29 @@ class PhotoRecCleanerApp(toga.App):
         self.activity_indicator.style.visibility = "hidden"
         self.progress_bar.style.visibility = "hidden"
 
-        # Reset start button
-        self.start_button.text = "Start Live Monitoring"
-        self.start_button.on_press = self.start_monitoring_handler
+        # Reset buttons
+        self.process_button.text = "Process"
         self._update_start_button_state()
 
-        # clean_now is disabled because folders are gone
-        self.clean_now_button.enabled = False
+        # processing is disabled because folders are gone
+        self.process_button.enabled = False
 
         self.app_state.reset()
         self.guidance_label.text = ""
         self.update_tally()
+
+    def _process_or_finalize_handler(self, widget: toga.Button) -> None:
+        """Decide whether to process immediately or finalize monitoring."""
+        monitoring_active = bool(
+            self.controller.monitoring_task
+            and not self.controller.monitoring_task.done()
+        )
+        if monitoring_active:
+            # Run finalize path
+            asyncio.create_task(self.finish_handler(None))
+        else:
+            # Run one-shot processing path
+            asyncio.create_task(self.clean_now_handler(None))
 
     def _show_final_report(self) -> None:
         report_title = "Processing Complete"
