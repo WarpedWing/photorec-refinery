@@ -9,7 +9,6 @@ file operations, and reorganizing the final set of kept files.
 import contextlib
 import os
 import shutil
-from math import ceil
 from pathlib import Path
 
 

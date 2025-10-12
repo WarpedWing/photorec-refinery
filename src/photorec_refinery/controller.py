@@ -236,7 +236,9 @@ class AppController:
             if self.app_state.cancelled:
                 return
             message = "Reorganizing files..."
-            self.loop.call_soon_threadsafe(self.app._set_status_text_threadsafe, message)
+            self.loop.call_soon_threadsafe(
+                self.app._set_status_text_threadsafe, message
+            )
             batch_size = int(self.app.batch_size_input.value)
             try:
                 organize_by_type(base_dir, self.app_state, batch_size=batch_size)
@@ -263,7 +265,9 @@ class AppController:
 
         self._close_log_file()
         steps_done += 1
-        self.loop.call_soon_threadsafe(self.app.update_progress, steps_done, total_steps)
+        self.loop.call_soon_threadsafe(
+            self.app.update_progress, steps_done, total_steps
+        )
 
     def _close_log_file(self) -> None:
         """Closes the log file handle if it's open."""
@@ -341,9 +345,7 @@ class AppController:
                 break
             self.app_state.cleaned_folders.add(folder)
             self.loop.call_soon_threadsafe(self.app.update_tally)
-            self.loop.call_soon_threadsafe(
-                self.app.update_progress, i + 1, num_folders
-            )
+            self.loop.call_soon_threadsafe(self.app.update_progress, i + 1, num_folders)
 
         if self.app_state.cancelled:
             self._close_log_file()
@@ -466,7 +468,11 @@ class AppController:
             "total_space_saved_bytes",
             "total_space_saved_gb",
         ]
-        gb = self.app_state.total_deleted_size / (1024 ** 3) if self.app_state.total_deleted_size else 0.0
+        gb = (
+            self.app_state.total_deleted_size / (1024**3)
+            if self.app_state.total_deleted_size
+            else 0.0
+        )
         row = [
             ts,
             str(base_dir),

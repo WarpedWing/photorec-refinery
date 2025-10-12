@@ -1,13 +1,6 @@
 """
-Toga GUI for PhotoRec Cleaner — rewritten to run the cleaning logic
-off-thread, keep the UI responsive, avoid dangling tasks, and provide
-concise status updates.
+Toga GUI for PhotoRec Refinery.
 
-Notes:
- - Uses asyncio.create_task to start the monitor loop.
- - Calls Cleaner.run_once inside asyncio.to_thread to avoid blocking the event loop.
- - Provides two status labels: one for general state and one for the last file (truncated).
- - Graceful shutdown: Finish button cancels the background task and waits briefly for it to stop.
 """
 
 from __future__ import annotations
@@ -322,20 +315,21 @@ class PhotoRecCleanerApp(toga.App):
             "How to Use PhotoRec Refinery\n\n"
             "1) Select the PhotoRec output directory. This is the folder that contains the generated recup_dir.* subfolders.\n\n"  # noqa: E501
             "2) Configure options as needed:\n"
-            "   - Enable File Deletion: Permanently delete files not worth keeping.\n"
-            "   - Keep (csv): File extensions to always keep (e.g., gz, sqlite).\n"
-            "   - Exclude (csv): Extensions to never keep even if they match keep (e.g., html.gz, xml.gz).\n"
-            "   - Enable Logging: Write an audit log of actions.\n"
-            "   - Reorganize Files: Optionally regroup files into batches for ease of review.\n\n"
-            "3) Live Monitoring: Click 'Live Monitor' to clean as PhotoRec recovers files. When PhotoRec is done, click 'Finalize' to stop monitoring and see a summary.\n\n"  # noqa: E501
-            "4) One‑Shot: If you already have a completed PhotoRec output, click 'Process' to clean it immediately.\n\n"  # noqa: E501
-            "Notes:\n"
-            "- Deletions are permanent. Review your 'Keep' and 'Exclude' lists carefully.\n"
-            "- Status shows the last action; the running tally tracks overall progress.\n"
-            "- You can cancel at any time; partial results remain.\n"
+            "   - Enable File Deletion: Permanently delete unwanted files.\n"
+            "   - Keep (csv): File extensions to keep. Delete all others.\n"
+            "   - Exclude (csv): Keep all files except these. Can be used with keep to refine the query.\n"
+            "   - Enable Logging: Write an audit log of file actions.\n"
+            "   - Reorganize Files: Reorganize files into folders named by filetype.\n"
+            "   - Batch Size: The number of files you want in each subfolder.\n\n"
+            "3) Live Monitoring: Click 'Live Monitor' to clean as PhotoRec recovers files.\n"
+            "   When PhotoRec is done, click 'Finalize'.\n\n"
+            "4) Process: If you already have a completed PhotoRec output, click 'Process'.\n\n"
+            "Need More Help?\n"
+            "- Email me at noel@warpedwinglabs.com\n"
+            "- https://github.com/WarpedWing.\n"
         )
 
-        # Build a simple scrollable view to handle long content gracefully
+        # Help text box
         text_label = toga.Label(message, style=Pack(padding=10))
         content_box = toga.Box(style=Pack(direction="column", flex=1))
         content_box.add(text_label)
