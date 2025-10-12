@@ -6,35 +6,37 @@ UI implementation in `gui.py`. It handles user actions, manages background
 tasks, and updates the application state.
 """
 
+from __future__ import annotations
+
 import asyncio
 import csv
-import os
 from datetime import datetime
-from typing import Optional, TYPE_CHECKING
+from pathlib import Path
+from typing import TYPE_CHECKING
 
-from ..photorec_refinery.app_state import AppState
-from ..photorec_refinery.file_utils import (
+from photorec_refinery.file_utils import (
     clean_folder,
     get_recup_dirs,
     organize_by_type,
 )
-from ..photorec_refinery.photorec_refinery import Cleaner
-from .gui_utils import shorten_path
+from photorec_refinery.gui_utils import shorten_path
+from photorec_refinery.photorec_refinery import Cleaner
 
 if TYPE_CHECKING:
-    from .gui import PhotoRecCleanerApp
+    from photorec_refinery.app_state import AppState
+    from photorec_refinery.gui import PhotoRecCleanerApp
 
 
 class AppController:
     """Handles application logic for the PhotoRecCleanerApp."""
 
-    def __init__(self, app: "PhotoRecCleanerApp", app_state: AppState):
+    def __init__(self, app: PhotoRecCleanerApp, app_state: AppState):
         self.app = app
         self.app_state = app_state
         self.loop = asyncio.get_running_loop()
-        self.cleaner: Optional[Cleaner] = None
-        self.monitoring_task: Optional[asyncio.Task] = None
-        self.polling_task: Optional[asyncio.Task] = None
+        self.cleaner: Cleaner | None = None
+        self.monitoring_task: asyncio.Task | None = None
+        self.polling_task: asyncio.Task | None = None
         self._stop_monitoring = False
 
     def set_cleaner(self, path: str):
@@ -80,10 +82,10 @@ class AppController:
         if self.app.log_switch.value and self.app.log_path_input.value:
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
             log_filename = f"photorec_refinery_log_{ts}.csv"
-            log_filepath = os.path.join(self.app.log_path_input.value, log_filename)
+            log_filepath = Path(self.app.log_path_input.value) / log_filename
             try:
                 # The file handle needs to be kept open.
-                self.app_state.log_file_handle = open(log_filepath, "w", newline="")
+                self.app_state.log_file_handle = log_filepath.open("w", newline="")
                 self.app_state.log_writer = csv.writer(self.app_state.log_file_handle)
                 self.app_state.log_writer.writerow(
                     ["Folder", "Filename", "Extension", "Status", "Size"]
@@ -245,9 +247,9 @@ class AppController:
             self.app._update_progress_async(steps_done, total_steps), loop
         )
 
-    def _close_log_file(self):
+    def _close_log_file(self) -> None:
         """Closes the log file handle if it's open."""
-        if getattr(self.app_state, "log_file_handle", None):
+        if self.app_state.log_file_handle is not None:
             self.app_state.log_file_handle.close()
             self.app_state.log_writer = None
             self.app_state.log_file_handle = None

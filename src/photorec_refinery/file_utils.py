@@ -6,9 +6,11 @@ cleaning files within those directories based on extension rules, logging
 file operations, and reorganizing the final set of kept files.
 """
 
+import contextlib
 import os
 import shutil
 from math import ceil
+from pathlib import Path
 
 
 def clean_folder(
@@ -31,11 +33,13 @@ def clean_folder(
         prefix (str, optional): A string to prepend to activity log messages.
     """
     files_processed = 0
-    folder_name = os.path.basename(folder)
+    folder_path = Path(folder)
+    folder_name = folder_path.name
 
     for root, _, files in os.walk(folder):
         if state.cancelled:
             break
+        root_path = Path(root)
         for f in files:
             if state.cancelled:
                 break
@@ -45,11 +49,11 @@ def clean_folder(
             if logger:
                 logger(activity_message)
 
-            path = os.path.join(root, f)
+            path = root_path / f
             lower_f = f.lower()
 
             # Determine the primary extension for organization and logging
-            primary_ext = os.path.splitext(lower_f)[1][1:] if "." in lower_f else ""
+            primary_ext = Path(lower_f).suffix[1:] if "." in lower_f else ""
 
             # Default to keeping the file if no keep rules are specified.
             # If keep_ext is a non-empty set, default to deleting.
@@ -73,18 +77,18 @@ def clean_folder(
 
             if keep:
                 state.total_kept_count += 1
-                state.kept_files.setdefault(primary_ext, []).append(path)
-                log_action(state, folder_name, f, primary_ext, "kept", path)
+                state.kept_files.setdefault(primary_ext, []).append(str(path))
+                log_action(state, folder_name, f, primary_ext, "kept", str(path))
                 if logger:
                     logger(f"Kept: {f}")
             else:
                 try:
-                    size = os.path.getsize(path)
-                    os.remove(path)
+                    size = path.stat().st_size
+                    path.unlink()
                     state.total_deleted_count += 1
                     state.total_deleted_size += size
                     log_action(
-                        state, folder_name, f, primary_ext, "deleted", path, size
+                        state, folder_name, f, primary_ext, "deleted", str(path), size
                     )
                     if logger:
                         logger(f"Deleted: {f}")
@@ -112,7 +116,7 @@ def log_action(state, folder, filename, ext, status, path, size=None):
 
     if size is None:
         try:
-            size = os.path.getsize(path)
+            size = Path(path).stat().st_size
         except OSError:
             size = -1
 
@@ -132,12 +136,13 @@ def get_recup_dirs(base_dir):
         list: A sorted list of full paths to the `recup_dir` directories.
     """
     dirs = []
-    for d in os.listdir(base_dir):
-        if d.startswith("recup_dir.") and os.path.isdir(os.path.join(base_dir, d)):
+    base_path = Path(base_dir)
+    for d in base_path.iterdir():
+        if d.name.startswith("recup_dir.") and d.is_dir():
             try:
                 # Extract number for sorting, e.g., 'recup_dir.10' -> 10
-                dir_num = int(d.split(".")[-1])
-                dirs.append((dir_num, os.path.join(base_dir, d)))
+                dir_num = int(d.name.split(".")[-1])
+                dirs.append((dir_num, str(d)))
             except (ValueError, IndexError):
                 # Ignore directories that don't match the expected pattern
                 continue
@@ -161,11 +166,12 @@ def organize_by_type(base_dir, state, batch_size=500):
     if not state.kept_files or state.cancelled:
         return
 
+    base_path = Path(base_dir)
     for ext, paths in state.kept_files.items():
         if state.cancelled:
             break
-        type_folder = os.path.join(base_dir, ext)
-        os.makedirs(type_folder, exist_ok=True)
+        type_folder = base_path / ext
+        type_folder.mkdir(exist_ok=True)
 
         if not paths:
             continue
@@ -177,10 +183,8 @@ def organize_by_type(base_dir, state, batch_size=500):
             for path in paths:
                 if state.cancelled:
                     break
-                try:
+                with contextlib.suppress(shutil.Error, OSError):
                     shutil.move(path, type_folder)
-                except (shutil.Error, OSError):
-                    pass
         else:
             # If multiple batches are needed, create subfolders
             for i, path in enumerate(paths):
@@ -188,12 +192,10 @@ def organize_by_type(base_dir, state, batch_size=500):
                     break
                 batch_num = (i // batch_size) + 1
                 subfolder_name = str(batch_num)
-                subfolder = os.path.join(type_folder, subfolder_name)
-                os.makedirs(subfolder, exist_ok=True)
-                try:
+                subfolder = type_folder / subfolder_name
+                subfolder.mkdir(exist_ok=True)
+                with contextlib.suppress(shutil.Error, OSError):
                     shutil.move(path, subfolder)
-                except (shutil.Error, OSError):
-                    pass
 
     if state.cancelled:
         return
@@ -203,10 +205,8 @@ def organize_by_type(base_dir, state, batch_size=500):
     for folder in recup_dirs_to_delete:
         if state.cancelled:
             break
-        try:
+        with contextlib.suppress(OSError):
             shutil.rmtree(folder)
-        except OSError:
-            pass  # If it fails, the folder just remains.
 
 
 def get_files_in_directory(directory):
@@ -221,17 +221,18 @@ def get_files_in_directory(directory):
               (file_name, extension, size_in_bytes).
               Returns an empty list if the directory is not valid.
     """
-    if not os.path.isdir(directory):
+    dir_path = Path(directory)
+    if not dir_path.is_dir():
         return []
 
     files_list = []
-    for item in os.listdir(directory):
-        item_path = os.path.join(directory, item)
-        if os.path.isfile(item_path):
+    for item in dir_path.iterdir():
+        if item.is_file():
             try:
-                file_name, file_ext = os.path.splitext(item)
-                file_size = os.path.getsize(item_path)
-                files_list.append((file_name, file_ext.lstrip("."), file_size))
+                file_name = item.stem
+                file_ext = item.suffix.lstrip(".")
+                file_size = item.stat().st_size
+                files_list.append((file_name, file_ext, file_size))
             except OSError:
                 # Ignore files that can't be accessed
                 continue

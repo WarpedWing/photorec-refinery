@@ -3,10 +3,10 @@ Tests app against auto-created imaginary files.
 """
 
 import csv
-import os
 import shutil
 import unittest
 from io import StringIO
+from pathlib import Path
 
 from src.photorec_refinery import file_utils as fu
 from src.photorec_refinery.app_state import AppState
@@ -17,9 +17,9 @@ class TestFileUtils(unittest.TestCase):
 
     def setUp(self):
         """Set up a temporary directory with dummy files for each test."""
-        self.test_dir = "temp_test_dir"
-        self.recup_dir = os.path.join(self.test_dir, "recup_dir.1")
-        os.makedirs(self.recup_dir, exist_ok=True)
+        self.test_dir = Path("temp_test_dir")
+        self.recup_dir = self.test_dir / "recup_dir.1"
+        self.recup_dir.mkdir(parents=True, exist_ok=True)
 
         # Create dummy files with specific sizes
         self.files_to_create = {
@@ -32,13 +32,12 @@ class TestFileUtils(unittest.TestCase):
         }
 
         for filename, size in self.files_to_create.items():
-            path = os.path.join(self.recup_dir, filename)
-            with open(path, "wb") as f:
-                f.write(b"a" * size)  # Write content to match the size
+            path = self.recup_dir / filename
+            path.write_bytes(b"a" * size)  # Write content to match the size
 
     def tearDown(self):
         """Remove the temporary directory after each test."""
-        if os.path.exists(self.test_dir):
+        if self.test_dir.exists():
             shutil.rmtree(self.test_dir)
 
     def test_clean_folder_with_keep_rules_and_logging(self):
@@ -51,12 +50,12 @@ class TestFileUtils(unittest.TestCase):
         state.log_writer = csv.writer(log_stream)
 
         # --- Act ---
-        fu.clean_folder(self.recup_dir, state, keep_ext=keep_extensions)
+        fu.clean_folder(str(self.recup_dir), state, keep_ext=keep_extensions)
 
         # --- Assert ---
         # --- Assert File System State ---
         # Check file system state
-        remaining_files = os.listdir(self.recup_dir)
+        remaining_files = [f.name for f in self.recup_dir.iterdir()]
         self.assertIn("photo.jpg", remaining_files)
         self.assertIn("image.jpeg", remaining_files)
         self.assertIn("document.pdf", remaining_files)
@@ -99,14 +98,14 @@ class TestFileUtils(unittest.TestCase):
 
         # --- Act ---
         fu.clean_folder(
-            self.recup_dir,
+            str(self.recup_dir),
             state,
             keep_ext=keep_extensions,
             exclude_ext=exclude_extensions,
         )
 
         # --- Assert ---
-        remaining_files = os.listdir(self.recup_dir)
+        remaining_files = [f.name for f in self.recup_dir.iterdir()]
         self.assertIn("photo.jpg", remaining_files)
         self.assertNotIn("image.jpeg", remaining_files)
 
@@ -126,7 +125,7 @@ class TestFileUtils(unittest.TestCase):
 
         # --- Act ---
         fu.clean_folder(
-            self.recup_dir,
+            str(self.recup_dir),
             state,
             keep_ext=keep_extensions,
             exclude_ext=exclude_extensions,
@@ -142,11 +141,11 @@ class TestFileUtils(unittest.TestCase):
         keep_extensions = set()  # Empty set simulates deletion being disabled
 
         # --- Act ---
-        fu.clean_folder(self.recup_dir, state, keep_ext=keep_extensions)
+        fu.clean_folder(str(self.recup_dir), state, keep_ext=keep_extensions)
 
         # --- Assert ---
         # Verify that no files were deleted
-        remaining_files = os.listdir(self.recup_dir)
+        remaining_files = [f.name for f in self.recup_dir.iterdir()]
         self.assertEqual(len(remaining_files), len(self.files_to_create))
 
         # Verify the application state

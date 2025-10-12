@@ -8,19 +8,34 @@ This module deliberately keeps side effects minimal: it returns structured
 results rather than mutating UI objects directly.
 """
 
-import os
-import time
-from typing import Dict, Optional
+from __future__ import annotations
 
-from .app_state import AppState
+import time
+from pathlib import Path
+from typing import TYPE_CHECKING, TypedDict
+
 from .file_utils import clean_folder, get_recup_dirs
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from .app_state import AppState
+
+
+class CleanerResult(TypedDict):
+    """Return type for Cleaner.run_once()"""
+
+    processed_folders: list[str]
+    last_deleted: None
+    cleaned_count: int
+    timestamp: float
 
 
 class Cleaner:
     def __init__(self, base_dir: str):
         self.base_dir = base_dir
 
-    def _normalize_ext_set(self, ext_csv: str) -> set:
+    def _normalize_ext_set(self, ext_csv: str) -> set[str]:
         return {e.strip().lower() for e in ext_csv.split(",") if e.strip()}
 
     def run_once(
@@ -28,8 +43,8 @@ class Cleaner:
         keep_ext_csv: str,
         exclude_ext_csv: str,
         app_state: AppState,
-        logger: Optional[callable] = None,
-    ) -> Dict:
+        logger: Callable[[str], None] | None = None,
+    ) -> CleanerResult:
         keep_ext = self._normalize_ext_set(keep_ext_csv)
         exclude_ext = self._normalize_ext_set(exclude_ext_csv)
 
@@ -70,9 +85,8 @@ class Cleaner:
 
         # For live feedback, simply log the name of the active folder.
         # The controller loop handles the "Monitoring..." status if no folders exist.
-        if active_folder:
-            if logger:
-                logger(f"Processing folder: {os.path.basename(active_folder)}")
+        if active_folder and logger:
+            logger(f"Processing folder: {Path(active_folder).name}")
 
         return {
             "processed_folders": processed,

@@ -1,8 +1,8 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-from src.photorec_refinery.photorec_refinery import Cleaner
 from src.photorec_refinery.app_state import AppState
+from src.photorec_refinery.photorec_refinery import Cleaner
 
 
 class TestCleaner(unittest.TestCase):
@@ -54,7 +54,7 @@ class TestCleaner(unittest.TestCase):
             f"Processing {dir2}", [call[0][0] for call in mock_logger.call_args_list]
         )
         self.assertIn(
-            f"Processing folder: d3",
+            "Processing folder: d3",
             [call[0][0] for call in mock_logger.call_args_list],
         )
 

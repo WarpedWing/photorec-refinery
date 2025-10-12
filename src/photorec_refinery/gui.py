@@ -10,23 +10,55 @@ Notes:
  - Graceful shutdown: Finish button cancels the background task and waits briefly for it to stop.
 """
 
+from __future__ import annotations
+
 import asyncio
+from pathlib import Path
 
 import toga
 from toga.constants import GREEN
 from toga.style import Pack
 
-from ..photorec_refinery.app_state import AppState
-from ..photorec_refinery.file_utils import get_recup_dirs
-from .controller import AppController
-from .gui_utils import shorten_path
+from photorec_refinery.app_state import AppState
+from photorec_refinery.controller import AppController
+from photorec_refinery.file_utils import get_recup_dirs
+from photorec_refinery.gui_utils import shorten_path
 
 
 class PhotoRecCleanerApp(toga.App):
-    def startup(self):
-        self.main_window = toga.MainWindow(title=self.formal_name)
+    # Instance attributes type hints
+    app_state: AppState
+    controller: AppController
+    main_box: toga.Box
+    dir_path_input: toga.TextInput
+    cleaning_switch: toga.Switch
+    keep_ext_input: toga.TextInput
+    exclude_ext_input: toga.TextInput
+    log_switch: toga.Switch
+    log_path_input: toga.TextInput
+    log_path_button: toga.Button
+    reorg_switch: toga.Switch
+    batch_size_input: toga.NumberInput
+    folders_processed_label: toga.Label
+    files_kept_label: toga.Label
+    files_deleted_label: toga.Label
+    space_saved_label: toga.Label
+    progress_bar: toga.ProgressBar
+    activity_indicator: toga.ActivityIndicator
+    guidance_label: toga.Label
+    status_label: toga.Label
+    clean_now_button: toga.Button
+    start_button: toga.Button
+    finish_button: toga.Button
+    help_window: toga.Window | None
+
+    def startup(self) -> None:
+        self.main_window = toga.MainWindow(
+            title=self.formal_name
+        )  # type: ignore[assignment]
         self.app_state = AppState()
         self.controller = AppController(self, self.app_state)
+        self.help_window = None
 
         self.build_ui()
 
@@ -34,13 +66,13 @@ class PhotoRecCleanerApp(toga.App):
         self.toggle_log_path(self.log_switch)
         self._update_start_button_state()
 
-        self.main_window.content = self.main_box
-        self.main_window.on_close = (
+        self.main_window.content = self.main_box  # type: ignore[attr-defined]
+        self.main_window.on_close = (  # type: ignore[attr-defined]
             self.on_close
         )  # ensure graceful shutdown on window close
-        self.main_window.show()
+        self.main_window.show()  # type: ignore[attr-defined]
 
-    def build_ui(self):
+    def build_ui(self) -> None:
         # load logo
         photorec_cleaner_logo = toga.Image(
             "resources/WarpedWingLabsLogo_Horizontal_Compressed_W500_blur.png"
@@ -51,24 +83,13 @@ class PhotoRecCleanerApp(toga.App):
             toga.ImageView(photorec_cleaner_logo, height=75, margin_bottom=10)
         )
 
-        label1 = toga.Label("1. Select the PhotoRec output directory.")
-        label2 = toga.Label("2. Configure options as needed.")
-        label3 = toga.Label(
-            '3. Click "Start Live Monitoring" to begin cleaning as files are recovered.'
+        # Replace instructional scroll container with a right-aligned Help button
+        # spacer to push Help right
+        header_box.add(toga.Box(style=Pack(flex=1)))
+        help_button = toga.Button(
+            "Help", on_press=self.show_help, style=Pack(height=24)
         )
-        label4 = toga.Label(
-            '4. Click "Finalize" when PhotoRec is finished to stop monitoring and see a summary.'
-        )
-        label5 = toga.Label(
-            '5. Alternatively, click "Process Now" to clean an existing PhotoRec output folder.'
-        )
-        content = toga.Box(
-            children=[label1, label2, label3, label4, label5],
-            style=Pack(direction="column"),
-        )
-
-        container = toga.ScrollContainer(content=content, flex=1)
-        header_box.add(container)
+        header_box.add(help_button)
 
         main_box = toga.Box(
             style=Pack(
@@ -268,12 +289,67 @@ class PhotoRecCleanerApp(toga.App):
 
         self.main_box = main_box
 
-    def _set_initial_cleaning_controls_state(self):
+    async def show_help(self, widget: toga.Button) -> None:
+        """Show a larger dedicated Help window with room for longer text."""
+        if self.help_window is not None:
+            # If already open, bring it to front
+            self.help_window.show()
+            return
+
+        message = (
+            "How to Use PhotoRec Refinery\n\n"
+            "1) Select the PhotoRec output directory. This is the folder that contains the generated recup_dir.* subfolders.\n\n"  # noqa: E501
+            "2) Configure options as needed:\n"
+            "   - Enable File Deletion: Permanently delete files not worth keeping.\n"
+            "   - Keep (csv): File extensions to always keep (e.g., gz, sqlite).\n"
+            "   - Exclude (csv): Extensions to never keep even if they match keep (e.g., html.gz, xml.gz).\n"
+            "   - Enable Logging: Write an audit log of actions.\n"
+            "   - Reorganize Files: Optionally regroup files into batches for ease of review.\n\n"
+            "3) Live Monitoring: Click 'Start Live Monitoring' to clean as PhotoRec recovers files. When PhotoRec is done, click 'Finalize' to stop monitoring and see a summary.\n\n"  # noqa: E501
+            "4) One‑Shot: If you already have a completed PhotoRec output, click 'Process Now' to clean it immediately.\n\n"  # noqa: E501
+            "Notes:\n"
+            "- Deletions are permanent. Review your 'Keep' and 'Exclude' lists carefully.\n"
+            "- Status shows the last action; the running tally tracks overall progress.\n"
+            "- You can cancel at any time; partial results remain.\n"
+        )
+
+        # Build a simple scrollable view to handle long content gracefully
+        text_label = toga.Label(message, style=Pack(padding=10))
+        content_box = toga.Box(style=Pack(direction="column", flex=1))
+        content_box.add(text_label)
+
+        scroll = toga.ScrollContainer(
+            content=content_box, horizontal=False, vertical=True, style=Pack(flex=1)
+        )
+
+        close_button = toga.Button(
+            "Close",
+            on_press=lambda w: self.help_window.close() if self.help_window else None,
+            style=Pack(margin=10, width=100),
+        )
+
+        wrapper = toga.Box(style=Pack(direction="column", flex=1))
+        wrapper.add(scroll)
+        wrapper.add(close_button)
+
+        self.help_window = toga.Window(
+            title="PhotoRec Refinery — Help", size=(700, 500)
+        )
+        self.help_window.content = wrapper
+
+        def _on_close(win: toga.Window, **kwargs: object) -> bool:
+            self.help_window = None
+            return True
+
+        self.help_window.on_close = _on_close
+        self.help_window.show()
+
+    def _set_initial_cleaning_controls_state(self) -> None:
         """Sets the initial enabled state of the cleaning controls."""
         self.keep_ext_input.enabled = self.cleaning_switch.value
         self.exclude_ext_input.enabled = self.cleaning_switch.value
 
-    def _update_start_button_state(self, widget=None):
+    def _update_start_button_state(self, widget: object = None) -> None:
         is_directory_selected = bool(self.dir_path_input.value)
         is_any_option_selected = (
             self.cleaning_switch.value
@@ -282,9 +358,9 @@ class PhotoRecCleanerApp(toga.App):
         )
         self.start_button.enabled = is_directory_selected and is_any_option_selected
 
-    async def toggle_cleaning_controls(self, widget):
+    async def toggle_cleaning_controls(self, widget: toga.Switch) -> None:
         if widget.value:
-            confirmed = await self.main_window.dialog(
+            confirmed = await self.main_window.dialog(  # type: ignore[attr-defined]
                 toga.ConfirmDialog(
                     "Confirm Permanent Deletion",
                     "Are you sure you want to enable file deletion? This action is permanent and cannot be undone.",
@@ -297,14 +373,14 @@ class PhotoRecCleanerApp(toga.App):
         self.exclude_ext_input.enabled = widget.value
         self._update_start_button_state()
 
-    def toggle_log_path(self, widget):
+    def toggle_log_path(self, widget: toga.Switch) -> None:
         self.log_path_input.enabled = widget.value
         self.log_path_button.enabled = widget.value
         self._update_start_button_state()
 
-    async def select_log_folder(self, widget):
+    async def select_log_folder(self, widget: toga.Button) -> None:
         try:
-            path = await self.main_window.dialog(
+            path = await self.main_window.dialog(  # type: ignore[attr-defined]
                 toga.SelectFolderDialog(
                     title="Select Log Folder", initial_directory=None
                 )
@@ -312,13 +388,13 @@ class PhotoRecCleanerApp(toga.App):
             if path:
                 self.log_path_input.value = str(path)
         except ValueError:
-            await self.main_window.dialog(
+            await self.main_window.dialog(  # type: ignore[attr-defined]
                 toga.InfoDialog("Cancelled", "Log folder selection was cancelled.")
             )
 
-    async def select_directory(self, widget):
+    async def select_directory(self, widget: toga.Button) -> None:
         try:
-            path = await self.main_window.dialog(
+            path = await self.main_window.dialog(  # type: ignore[attr-defined]
                 toga.SelectFolderDialog(
                     title="Select PhotoRec Output Directory", initial_directory=None
                 )
@@ -331,13 +407,13 @@ class PhotoRecCleanerApp(toga.App):
                 self._update_start_button_state()
 
         except ValueError:
-            await self.main_window.dialog(
+            await self.main_window.dialog(  # type: ignore[attr-defined]
                 toga.InfoDialog("Cancelled", "Directory selection was cancelled.")
             )
         self.app_state.reset()
         self.update_tally()
 
-    def start_monitoring_handler(self, widget):
+    def start_monitoring_handler(self, widget: toga.Button) -> None:
         self.clean_now_button.enabled = False
         self.finish_button.enabled = True
         self.guidance_label.text = (
@@ -350,7 +426,7 @@ class PhotoRecCleanerApp(toga.App):
         self.start_button.text = "Cancel"
         self.start_button.on_press = self.cancel_handler
 
-    def cancel_handler(self, widget):
+    def cancel_handler(self, widget: toga.Button) -> None:
         """Immediately cancels all processing."""
         self.controller.cancel()
 
@@ -371,11 +447,11 @@ class PhotoRecCleanerApp(toga.App):
         # Restart polling to check for existing folders to enable the "Process Now" button
         self.controller.start_folder_polling()
 
-    def _set_status_text_threadsafe(self, message: str):
+    def _set_status_text_threadsafe(self, message: str) -> None:
         # Keep status concise to avoid layout thrashing
         self.status_label.text = shorten_path(message, maxlen=120)
 
-    def update_tally(self):
+    def update_tally(self) -> None:
         self.folders_processed_label.text = (
             f"Folders Processed: {len(self.app_state.cleaned_folders)}"
         )
@@ -396,7 +472,7 @@ class PhotoRecCleanerApp(toga.App):
             return f"{size_bytes / 1024**2:.1f} MB"
         return f"{size_bytes / 1024**3:.1f} GB"
 
-    async def finish_handler(self, widget):
+    async def finish_handler(self, widget: toga.Button) -> None:
         self.finish_button.enabled = False
         self.clean_now_button.enabled = False
 
@@ -431,7 +507,7 @@ class PhotoRecCleanerApp(toga.App):
         self.guidance_label.text = ""
         self.update_tally()
 
-    async def clean_now_handler(self, widget):
+    async def clean_now_handler(self, widget: toga.Button) -> None:
         """Handler for the 'Clean Now' button to process existing folders."""
         # --- Enter processing state ---
         self.clean_now_button.enabled = False
@@ -464,7 +540,7 @@ class PhotoRecCleanerApp(toga.App):
         self.guidance_label.text = ""
         self.update_tally()
 
-    def _show_final_report(self):
+    def _show_final_report(self) -> None:
         report_title = "Processing Complete"
         report_body = (
             f"Photorec Cleaning Complete\n\n"
@@ -478,42 +554,53 @@ class PhotoRecCleanerApp(toga.App):
             asyncio.get_running_loop(),
         )
 
-    def update_progress(self, value, max_value):
+    def update_progress(self, value: int, max_value: int) -> None:
         self.progress_bar.max = max_value
         self.progress_bar.value = value
 
-    async def _update_progress_async(self, value, max_value):
+    async def _update_progress_async(self, value: int, max_value: int) -> None:
         self.update_progress(value, max_value)
 
-    def update_status(self, message: str):
+    def update_status(self, message: str) -> None:
         # called from file_utils cleaners which might run in the main thread
         self.status_label.text = shorten_path(message, maxlen=120)
 
-    async def _update_tally_async(self):
+    async def _update_tally_async(self) -> None:
         """Async version of update_tally to be called from other threads."""
         self.update_tally()
 
-    async def _set_status_text_async(self, message: str):
+    async def _set_status_text_async(self, message: str) -> None:
         """Async version of setting status text to be called from other threads."""
         self.status_label.text = shorten_path(message, maxlen=120)
 
-    async def _show_dialog_async(self, title: str, message: str):
+    async def _show_dialog_async(self, title: str, message: str) -> None:
         """Creates and shows a dialog from a coroutine, ensuring it's on the main thread."""
         dialog = toga.InfoDialog(title, message)
-        await self.main_window.dialog(dialog)
+        await self.main_window.dialog(dialog)  # type: ignore[attr-defined]
 
-    def on_close(self, widget=None, **kwargs):
+    def on_close(self, window: toga.Window, **kwargs: object) -> bool:
         self.controller.on_close()
         return True
 
 
-def main():
-    return PhotoRecCleanerApp(
-        "PhotoRec Refinery",
-        "org.beeware.photorec_refinery",
-        icon="resources/photorec_refinery",
+def main() -> None:
+    print("--- Entering main function ---")
+    # app icon path must be absolute to be found reliably
+    # Explicitly add the .icns extension for macOS
+    icon_path = Path(__file__).parent / "resources"
+
+    # --- DEBUGGING: Check if the path is correct and the file exists ---
+    print(f"Attempting to load icon from absolute path: {icon_path}")
+    print(f"Does icon file exist? {Path.exists(icon_path)}")
+    # --- END DEBUGGING ---
+    app = PhotoRecCleanerApp(
+        formal_name="PhotoRec Refinery",
+        app_id="org.beeware.photorec_refinery",
+        app_name="photorec_refinery",
+        icon=str(icon_path),
     )
+    app.main_loop()
 
 
 if __name__ == "__main__":
-    main().main_loop()
+    main()

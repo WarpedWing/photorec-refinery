@@ -9,6 +9,7 @@ and user input.
 import os
 import re
 import time
+from pathlib import Path
 from threading import Thread
 
 # --- ANSI color codes ---
@@ -74,7 +75,7 @@ def print_intro(output_dir):
     print(f"\n{'=' * (BOX_WIDTH + 2)}")
     print(f"{f'{BOLD}PhotoRec Cleaner v0.2{RESET}':^{BOX_WIDTH + 10}}")
     print(f"{'=' * (BOX_WIDTH + 2)}")
-    print(f"  Output directory: {GREEN}{os.path.abspath(output_dir)}{RESET}")
+    print(f"  Output directory: {GREEN}{Path(output_dir).resolve()}{RESET}")
     print(
         f"  Press {BLUE}'y' + Enter{RESET} when PhotoRec is done to finish cleaning.\n"
     )

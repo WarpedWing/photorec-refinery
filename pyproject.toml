@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "photorec-refinery"
-version = "0.2.0"
+version = "0.5.0"
 description = "A tool to clean and organize PhotoRec output directories."
 requires-python = ">=3.8"
 dependencies = [
@@ -53,4 +53,9 @@ extend-select = [
 ignore = [
     "B011",
     "E501"
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.14.0",
 ]
