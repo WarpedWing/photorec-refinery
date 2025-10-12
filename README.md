@@ -39,7 +39,6 @@ Download the latest release for your platform from the [Releases](https://github
 
 - **macOS**: Download `PhotoRec-Refinery-X.X.X.dmg`
 - **Windows**: Download `PhotoRec-Refinery-X.X.X.msi`
-- **Linux**: Download `PhotoRec-Refinery-X.X.X.AppImage`
 
 #### Running on macOS (Unsigned App)
 
