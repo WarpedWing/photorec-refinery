@@ -80,6 +80,9 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 git clone https://github.com/WarpedWing/photorec-refinery.git
 cd photorec-refinery
 
+# Install the package
+uv pip install -e .
+
 # Run the GUI app
 uv run photorec-refinery-gui
 ```
@@ -160,6 +163,23 @@ Right-click the app and select "Open", then click "Open" in the dialog.
 ### Windows: SmartScreen warning
 
 Click "More info" then "Run anyway"
+
+### Windows: "photorec-refinery-gui program not found" when using uv
+
+On Windows, you need to explicitly install the package first before running the script:
+
+```bash
+# Install the package first
+uv pip install -e .
+
+# Then run the GUI
+uv run photorec-refinery-gui
+```
+
+Alternatively, you can run it as a Python module:
+```bash
+uv run python -m photorec_refinery
+```
 
 ### App doesn't detect PhotoRec folders
 
