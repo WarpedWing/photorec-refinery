@@ -175,6 +175,7 @@ class PhotoRecCleanerApp(toga.App):
         batch_label = toga.Label(
             "Batch Size:", style=Pack(margin_left=10, margin_right=10)
         )
+        # Batch size for reorganization. Using integer semantics.
         self.batch_size_input = toga.NumberInput(value=500, min=1, style=Pack(width=80))
         reorg_box.add(self.reorg_switch)
         reorg_box.add(batch_label)
@@ -394,6 +395,16 @@ class PhotoRecCleanerApp(toga.App):
 
         self.keep_ext_input.enabled = widget.value
         self.exclude_ext_input.enabled = widget.value
+        # If enabling deletion, clear the example values to let user choose
+        if widget.value:
+            self.keep_ext_input.value = ""
+            self.exclude_ext_input.value = ""
+        else:
+            # If disabling, restore examples if fields are empty
+            if not self.keep_ext_input.value:
+                self.keep_ext_input.value = "gz,sqlite"
+            if not self.exclude_ext_input.value:
+                self.exclude_ext_input.value = "html.gz,xml.gz"
         self._update_start_button_state()
 
     def toggle_log_path(self, widget: toga.Switch) -> None:

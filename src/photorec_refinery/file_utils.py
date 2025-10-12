@@ -188,26 +188,24 @@ def organize_by_type(base_dir, state, batch_size=500):
         if not paths:
             continue
 
-        num_batches = ceil(len(paths) / batch_size)
-
-        if num_batches <= 1:
-            # If there's only one batch, move files directly to the type_folder
-            for path in paths:
-                if state.cancelled:
-                    raise OperationCancelled()
-                with contextlib.suppress(shutil.Error, OSError):
-                    shutil.move(path, type_folder)
-        else:
-            # If multiple batches are needed, create subfolders
-            for i, path in enumerate(paths):
-                if state.cancelled:
-                    raise OperationCancelled()
-                batch_num = (i // batch_size) + 1
-                subfolder_name = str(batch_num)
-                subfolder = type_folder / subfolder_name
-                subfolder.mkdir(exist_ok=True)
-                with contextlib.suppress(shutil.Error, OSError):
-                    shutil.move(path, subfolder)
+        use_subfolders = len(paths) > batch_size
+        moved = 0
+        for path in paths:
+            if state.cancelled:
+                raise OperationCancelled()
+            # Determine destination based on successfully moved count
+            if use_subfolders:
+                batch_num = (moved // batch_size) + 1
+                dest = type_folder / str(batch_num)
+                dest.mkdir(exist_ok=True)
+            else:
+                dest = type_folder
+            try:
+                shutil.move(path, dest)
+                moved += 1
+            except (shutil.Error, OSError):
+                # Skip files that can't be moved; don't advance batch counter
+                continue
 
     if state.cancelled:
         raise OperationCancelled()

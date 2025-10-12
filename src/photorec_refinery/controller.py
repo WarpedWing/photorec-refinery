@@ -184,9 +184,8 @@ class AppController:
             if last_folder not in self.app_state.cleaned_folders:
                 total_steps += 1
 
-        asyncio.run_coroutine_threadsafe(
-            self.app._update_progress_async(0, total_steps), loop
-        )
+        # Initial progress
+        self.loop.call_soon_threadsafe(self.app.update_progress, 0, total_steps)
 
         steps_done = 0
 
@@ -196,8 +195,8 @@ class AppController:
             last_folder = recup_dirs[-1]
             if last_folder not in self.app_state.cleaned_folders:
                 message = f"Processing final folder {shorten_path(last_folder, 60)}..."
-                asyncio.run_coroutine_threadsafe(
-                    self.app._set_status_text_async(message), loop
+                self.loop.call_soon_threadsafe(
+                    self.app._set_status_text_threadsafe, message
                 )
                 # Respect the cleaning switch for the final pass
                 keep_ext_str = (
@@ -227,31 +226,29 @@ class AppController:
                 except OperationCancelled:
                     return
                 self.app_state.cleaned_folders.add(last_folder)
-                asyncio.run_coroutine_threadsafe(self.app._update_tally_async(), loop)
+                self.loop.call_soon_threadsafe(self.app.update_tally)
                 steps_done += 1
-                asyncio.run_coroutine_threadsafe(
-                    self.app._update_progress_async(steps_done, total_steps), loop
+                self.loop.call_soon_threadsafe(
+                    self.app.update_progress, steps_done, total_steps
                 )
 
         if self.app.reorg_switch.value:
             if self.app_state.cancelled:
                 return
             message = "Reorganizing files..."
-            asyncio.run_coroutine_threadsafe(
-                self.app._set_status_text_async(message), loop
-            )
+            self.loop.call_soon_threadsafe(self.app._set_status_text_threadsafe, message)
             batch_size = int(self.app.batch_size_input.value)
             try:
                 organize_by_type(base_dir, self.app_state, batch_size=batch_size)
             except OperationCancelled:
                 return
             message = "Reorganization complete."
-            asyncio.run_coroutine_threadsafe(
-                self.app._set_status_text_async(message), loop
+            self.loop.call_soon_threadsafe(
+                self.app._set_status_text_threadsafe, message
             )
             steps_done += 1
-            asyncio.run_coroutine_threadsafe(
-                self.app._update_progress_async(steps_done, total_steps), loop
+            self.loop.call_soon_threadsafe(
+                self.app.update_progress, steps_done, total_steps
             )
 
         if self.app_state.cancelled:
@@ -266,9 +263,7 @@ class AppController:
 
         self._close_log_file()
         steps_done += 1
-        asyncio.run_coroutine_threadsafe(
-            self.app._update_progress_async(steps_done, total_steps), loop
-        )
+        self.loop.call_soon_threadsafe(self.app.update_progress, steps_done, total_steps)
 
     def _close_log_file(self) -> None:
         """Closes the log file handle if it's open."""
@@ -314,9 +309,7 @@ class AppController:
             return
 
         num_folders = len(recup_dirs)
-        asyncio.run_coroutine_threadsafe(
-            self.app._update_progress_async(0, num_folders), loop
-        )
+        self.loop.call_soon_threadsafe(self.app.update_progress, 0, num_folders)
 
         # Respect the cleaning switch for the one-shot process
         keep_ext_str = (
@@ -332,8 +325,8 @@ class AppController:
             if self.app_state.cancelled:
                 break
             message = f"Processing folder {i + 1}/{num_folders}..."
-            asyncio.run_coroutine_threadsafe(
-                self.app._set_status_text_async(message), loop
+            self.loop.call_soon_threadsafe(
+                self.app._set_status_text_threadsafe, message
             )
             try:
                 clean_folder(
@@ -347,9 +340,9 @@ class AppController:
             except OperationCancelled:
                 break
             self.app_state.cleaned_folders.add(folder)
-            asyncio.run_coroutine_threadsafe(self.app._update_tally_async(), loop)
-            asyncio.run_coroutine_threadsafe(
-                self.app._update_progress_async(i + 1, num_folders), loop
+            self.loop.call_soon_threadsafe(self.app.update_tally)
+            self.loop.call_soon_threadsafe(
+                self.app.update_progress, i + 1, num_folders
             )
 
         if self.app_state.cancelled:
@@ -358,15 +351,15 @@ class AppController:
 
         if self.app.reorg_switch.value:
             message = "Reorganizing files..."
-            asyncio.run_coroutine_threadsafe(
-                self.app._set_status_text_async(message), loop
+            self.loop.call_soon_threadsafe(
+                self.app._set_status_text_threadsafe, message
             )
             batch_size = int(self.app.batch_size_input.value)
             with contextlib.suppress(OperationCancelled):
                 organize_by_type(base_dir, self.app_state, batch_size=batch_size)
             message = "Reorganization complete."
-            asyncio.run_coroutine_threadsafe(
-                self.app._set_status_text_async(message), loop
+            self.loop.call_soon_threadsafe(
+                self.app._set_status_text_threadsafe, message
             )
 
         if self.app_state.cancelled:
@@ -471,7 +464,9 @@ class AppController:
             "files_kept",
             "files_deleted",
             "total_space_saved_bytes",
+            "total_space_saved_gb",
         ]
+        gb = self.app_state.total_deleted_size / (1024 ** 3) if self.app_state.total_deleted_size else 0.0
         row = [
             ts,
             str(base_dir),
@@ -479,6 +474,7 @@ class AppController:
             self.app_state.total_kept_count,
             self.app_state.total_deleted_count,
             self.app_state.total_deleted_size,
+            f"{gb:.3f}",
         ]
 
         with outfile.open("w", newline="") as f:
