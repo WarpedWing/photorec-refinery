@@ -80,7 +80,7 @@ git clone https://github.com/WarpedWing/photorec-refinery.git
 cd photorec-refinery
 
 # Install the package
-uv pip install -e .
+uv run pip install -e .
 
 # Run the GUI app
 uv run photorec-refinery-gui
@@ -176,6 +176,7 @@ uv run photorec-refinery-gui
 ```
 
 Alternatively, you can run it as a Python module:
+
 ```bash
 uv run python -m photorec_refinery
 ```
