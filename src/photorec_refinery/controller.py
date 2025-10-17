@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import csv
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -21,7 +22,7 @@ from photorec_refinery.file_utils import (
     get_recup_dirs,
     organize_by_type,
 )
-from photorec_refinery.gui_utils import shorten_path
+from photorec_refinery.gui_utils import tail_truncate
 from photorec_refinery.photorec_refinery import Cleaner
 
 if TYPE_CHECKING:
@@ -62,7 +63,7 @@ class AppController:
 
     async def _poll_for_folders(self):
         """Periodically checks for recup_dir folders to enable the Process button."""
-        base_dir = self.app.dir_path_input.value
+        base_dir = self.app.get_base_dir()
         if not base_dir:
             return
 
@@ -89,10 +90,10 @@ class AppController:
 
     def _setup_logging(self):
         """Creates and opens the log file if logging is enabled."""
-        if self.app.log_switch.value and self.app.log_path_input.value:
+        if self.app.log_switch.value and self.app.get_log_dir():
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
             log_filename = f"photorec_refinery_log_{ts}.csv"
-            log_filepath = Path(self.app.log_path_input.value) / log_filename
+            log_filepath = Path(self.app.get_log_dir()) / log_filename
             try:
                 # The file handle needs to be kept open.
                 self.app_state.log_file_handle = log_filepath.open("w", newline="")
@@ -127,12 +128,12 @@ class AppController:
 
                 # Pass empty strings for extensions if cleaning is disabled
                 keep_csv = (
-                    self.app.keep_ext_input.value
+                    self._csv_from_exts(self.app.keep_ext_input.value)
                     if self.app.cleaning_switch.value
                     else ""
                 )
                 exclude_csv = (
-                    self.app.exclude_ext_input.value
+                    self._csv_from_exts(self.app.exclude_ext_input.value)
                     if self.app.cleaning_switch.value
                     else ""
                 )
@@ -162,7 +163,7 @@ class AppController:
             self._stop_monitoring = True
             self.monitoring_task.cancel()
 
-        base_dir = self.app.dir_path_input.value
+        base_dir = self.app.get_base_dir()
         if not base_dir:
             return
 
@@ -194,7 +195,7 @@ class AppController:
                 return
             last_folder = recup_dirs[-1]
             if last_folder not in self.app_state.cleaned_folders:
-                message = f"Processing final folder {shorten_path(last_folder, 60)}..."
+                message = f"Processing final folder {tail_truncate(last_folder, 60)}..."
                 self.loop.call_soon_threadsafe(
                     self.app._set_status_text_threadsafe, message
                 )
@@ -209,12 +210,8 @@ class AppController:
                     if self.app.cleaning_switch.value
                     else ""
                 )
-                keep_ext = {
-                    ext.strip() for ext in keep_ext_str.split(",") if ext.strip()
-                }
-                exclude_ext = {
-                    ext.strip() for ext in exclude_ext_str.split(",") if ext.strip()
-                }
+                keep_ext = self._split_exts(keep_ext_str)
+                exclude_ext = self._split_exts(exclude_ext_str)
                 try:
                     clean_folder(
                         last_folder,
@@ -240,8 +237,16 @@ class AppController:
                 self.app._set_status_text_threadsafe, message
             )
             batch_size = int(self.app.batch_size_input.value)
+            # Switch progress bar to reorg mode (green) and use per-file progress
             try:
-                organize_by_type(base_dir, self.app_state, batch_size=batch_size)
+                # prime progress color to green
+                self.loop.call_soon_threadsafe(self.app.set_progress_color, "green")
+                organize_by_type(
+                    base_dir,
+                    self.app_state,
+                    batch_size=batch_size,
+                    progress_cb=self._reorg_progress_cb,
+                )
             except OperationCancelled:
                 return
             message = "Reorganization complete."
@@ -252,6 +257,8 @@ class AppController:
             self.loop.call_soon_threadsafe(
                 self.app.update_progress, steps_done, total_steps
             )
+            # restore default progress appearance
+            self.loop.call_soon_threadsafe(self.app.set_progress_color, None)
 
         if self.app_state.cancelled:
             return
@@ -288,7 +295,7 @@ class AppController:
     async def perform_one_shot_clean(self):
         """Runs the cleaning process once for all existing folders."""
         self.app_state.reset()  # Reset state before starting a new operation
-        base_dir = self.app.dir_path_input.value
+        base_dir = self.app.get_base_dir()
         if not base_dir:
             return
 
@@ -319,8 +326,8 @@ class AppController:
         exclude_ext_str = (
             self.app.exclude_ext_input.value if self.app.cleaning_switch.value else ""
         )
-        keep_ext = {ext.strip() for ext in keep_ext_str.split(",") if ext.strip()}
-        exclude_ext = {ext.strip() for ext in exclude_ext_str.split(",") if ext.strip()}
+        keep_ext = self._split_exts(keep_ext_str)
+        exclude_ext = self._split_exts(exclude_ext_str)
 
         for i, folder in enumerate(recup_dirs):
             if self.app_state.cancelled:
@@ -355,7 +362,15 @@ class AppController:
             )
             batch_size = int(self.app.batch_size_input.value)
             with contextlib.suppress(OperationCancelled):
-                organize_by_type(base_dir, self.app_state, batch_size=batch_size)
+                # Show green progress and report per-file progress during reorg
+                self.loop.call_soon_threadsafe(self.app.set_progress_color, "green")
+                organize_by_type(
+                    base_dir,
+                    self.app_state,
+                    batch_size=batch_size,
+                    progress_cb=self._reorg_progress_cb,
+                )
+                self.loop.call_soon_threadsafe(self.app.set_progress_color, None)
             message = "Reorganization complete."
             self.loop.call_soon_threadsafe(
                 self.app._set_status_text_threadsafe, message
@@ -445,8 +460,8 @@ class AppController:
         selected PhotoRec directory.
         """
         # Decide output directory
-        if self.app.log_switch.value and self.app.log_path_input.value:
-            out_dir = Path(self.app.log_path_input.value)
+        if self.app.log_switch.value and self.app.get_log_dir():
+            out_dir = Path(self.app.get_log_dir())
         else:
             out_dir = Path(base_dir)
 
@@ -484,3 +499,18 @@ class AppController:
             writer = csv.writer(f)
             writer.writerow(headers)
             writer.writerow(row)
+
+    # --- Progress helpers ---
+    def _reorg_progress_cb(self, moved: int, total: int) -> None:
+        """Update progress bar from reorganization step."""
+        self.loop.call_soon_threadsafe(self.app.update_progress, moved, total)
+
+    # --- Extension parsing helpers ---
+    def _split_exts(self, text: str) -> set[str]:
+        """Split on commas, whitespace, or semicolons; lowercase; drop empties."""
+        tokens = re.split(r"[\s,;]+", text or "")
+        return {t.strip().lower() for t in tokens if t and t.strip()}
+
+    def _csv_from_exts(self, text: str) -> str:
+        exts = sorted(self._split_exts(text))
+        return ",".join(exts)

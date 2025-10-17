@@ -160,7 +160,7 @@ def get_recup_dirs(base_dir):
     return [path for _, path in sorted(dirs)]
 
 
-def organize_by_type(base_dir, state, batch_size=500):
+def organize_by_type(base_dir, state, batch_size=500, progress_cb=None):
     """
     Moves kept files into new folders organized by file type and batch size.
 
@@ -178,6 +178,18 @@ def organize_by_type(base_dir, state, batch_size=500):
         return
 
     base_path = Path(base_dir)
+
+    # Determine total moves for progress reporting
+    total_to_move = 0
+    if state.kept_files:
+        try:
+            total_to_move = sum(len(paths or []) for paths in state.kept_files.values())
+        except Exception:
+            total_to_move = 0
+    moved_overall = 0
+    if progress_cb and total_to_move > 0:
+        with contextlib.suppress(Exception):
+            progress_cb(0, total_to_move)
     for ext, paths in state.kept_files.items():
         if state.cancelled:
             raise OperationCancelled()
@@ -202,6 +214,10 @@ def organize_by_type(base_dir, state, batch_size=500):
             try:
                 shutil.move(path, dest)
                 moved += 1
+                moved_overall += 1
+                if progress_cb and total_to_move > 0:
+                    with contextlib.suppress(Exception):
+                        progress_cb(moved_overall, total_to_move)
             except (shutil.Error, OSError):
                 # Skip files that can't be moved; don't advance batch counter
                 continue

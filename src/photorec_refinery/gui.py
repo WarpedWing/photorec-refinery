@@ -17,7 +17,7 @@ from toga.style import Pack
 from photorec_refinery.app_state import AppState
 from photorec_refinery.controller import AppController
 from photorec_refinery.file_utils import get_recup_dirs
-from photorec_refinery.gui_utils import shorten_path
+from photorec_refinery.gui_utils import tail_truncate
 
 
 class PhotoRecCleanerApp(toga.App):
@@ -34,10 +34,10 @@ class PhotoRecCleanerApp(toga.App):
     log_path_button: toga.Button
     reorg_switch: toga.Switch
     batch_size_input: toga.NumberInput
-    folders_processed_label: toga.Label
-    files_kept_label: toga.Label
-    files_deleted_label: toga.Label
-    space_saved_label: toga.Label
+    folders_processed_value: toga.Label
+    files_kept_value: toga.Label
+    files_deleted_value: toga.Label
+    space_saved_value: toga.Label
     progress_bar: toga.ProgressBar
     activity_indicator: toga.ActivityIndicator
     guidance_label: toga.Label
@@ -48,6 +48,10 @@ class PhotoRecCleanerApp(toga.App):
     help_window: toga.Window | None
     active_task: asyncio.Task | None
     drop_updates: bool
+    _dir_path_full: str
+    _log_path_full: str
+    report_window: toga.Window | None
+    _suppress_delete_warning: bool
 
     def startup(self) -> None:
         self.main_window = toga.MainWindow(
@@ -56,14 +60,21 @@ class PhotoRecCleanerApp(toga.App):
         self.app_state = AppState()
         self.controller = AppController(self, self.app_state)
         self.help_window = None
+        self.report_window = None
         self.active_task = None
         self.drop_updates = False
+        self._dir_path_full = ""
+        self._log_path_full = ""
+        self._suppress_delete_warning = False
 
         self.build_ui()
 
         # Set initial state of controls now that they all exist.
         self.toggle_log_path(self.log_switch)
         self._update_start_button_state()
+
+        # Apply platform-specific styling
+        self._apply_platform_theme()
 
         self.main_window.content = self.main_box  # type: ignore[attr-defined]
         self.main_window.on_close = (  # type: ignore[attr-defined]
@@ -82,7 +93,7 @@ class PhotoRecCleanerApp(toga.App):
             toga.ImageView(photorec_cleaner_logo, height=75, margin_bottom=10)
         )
 
-        # Replace instructional scroll container with a right-aligned Help button
+        # Help button
         # spacer to push Help right
         header_box.add(toga.Box(style=Pack(flex=1)))
         help_button = toga.Button(
@@ -90,31 +101,30 @@ class PhotoRecCleanerApp(toga.App):
         )
         header_box.add(help_button)
 
-        main_box = toga.Box(
-            style=Pack(
-                direction="column",
-                margin_bottom=15,
-                margin_left=10,
-                margin_right=10,
-                flex=1,
-            )
-        )
-        main_box.add(header_box)
-        main_box.add(toga.Divider(margin_bottom=10))
+        # Outer box
+        main_box = toga.Box(style=Pack(direction="column", flex=1))
+        # Inner content wrapper
+        content_box = toga.Box(style=Pack(direction="column", flex=1, margin=12))
+        content_box.add(header_box)
+        content_box.add(toga.Divider(margin_bottom=10))
 
         # Directory selection
         dir_box = toga.Box(style=Pack(margin_bottom=10))
         dir_label = toga.Label(
             "PhotoRec Output Directory:", style=Pack(margin_right=10)
         )
-        self.dir_path_input = toga.TextInput(readonly=True, style=Pack(flex=1))
+        # Show truncated path; store full separately
+        self._updating_dir_field = False
+        self.dir_path_input = toga.TextInput(
+            readonly=False, on_change=self.on_dir_path_changed, style=Pack(flex=1)
+        )
         dir_select_button = toga.Button(
             "Select...", on_press=self.select_directory, style=Pack(margin_left=10)
         )
         dir_box.add(dir_label)
         dir_box.add(self.dir_path_input)
         dir_box.add(dir_select_button)
-        main_box.add(dir_box)
+        content_box.add(dir_box)
 
         # Extension inputs
         ext_box = toga.Box(style=Pack(margin_bottom=10))
@@ -123,14 +133,18 @@ class PhotoRecCleanerApp(toga.App):
             on_change=self.toggle_cleaning_controls,
             style=Pack(margin_right=10),
         )
-        keep_label = toga.Label("Keep (csv):", style=Pack(margin_right=10))
-        self.keep_ext_input = toga.TextInput(value="gz,sqlite", style=Pack(flex=1))
+        keep_label = toga.Label("Keep (csv or lines):", style=Pack(margin_right=10))
+        self.keep_ext_input = toga.MultilineTextInput(
+            value="", placeholder="gz\nsqlite", style=Pack(flex=1, height=60)
+        )
+        self.keep_ext_input.enabled = self.cleaning_switch.value
         exclude_label = toga.Label(
-            "Exclude (csv):", style=Pack(margin_left=10, margin_right=10)
+            "Exclude (csv or lines):", style=Pack(margin_left=10, margin_right=10)
         )
-        self.exclude_ext_input = toga.TextInput(
-            value="html.gz,xml.gz", style=Pack(flex=1)
+        self.exclude_ext_input = toga.MultilineTextInput(
+            value="", placeholder="html.gz\nxml.gz", style=Pack(flex=1, height=60)
         )
+        self.exclude_ext_input.enabled = self.cleaning_switch.value
         ext_box.add(self.cleaning_switch)
         ext_box.add(keep_label)
         ext_box.add(self.keep_ext_input)
@@ -139,7 +153,7 @@ class PhotoRecCleanerApp(toga.App):
 
         self._set_initial_cleaning_controls_state()
 
-        main_box.add(ext_box)
+        content_box.add(ext_box)
 
         # Logging controls
         log_box = toga.Box(style=Pack(margin_bottom=10))
@@ -148,7 +162,11 @@ class PhotoRecCleanerApp(toga.App):
             on_change=self.toggle_log_path,
             style=Pack(margin_right=10),
         )
-        self.log_path_input = toga.TextInput(readonly=True, style=Pack(flex=1))
+        # Show truncated path; store full separately
+        self._updating_log_field = False
+        self.log_path_input = toga.TextInput(
+            readonly=False, on_change=self.on_log_path_changed, style=Pack(flex=1)
+        )
         self.log_path_button = toga.Button(
             "Select Log Folder...",
             on_press=self.select_log_folder,
@@ -157,7 +175,7 @@ class PhotoRecCleanerApp(toga.App):
         log_box.add(self.log_switch)
         log_box.add(self.log_path_input)
         log_box.add(self.log_path_button)
-        main_box.add(log_box)
+        content_box.add(log_box)
 
         # Reorganization controls
         reorg_box = toga.Box(style=Pack(margin_bottom=10))
@@ -174,49 +192,40 @@ class PhotoRecCleanerApp(toga.App):
         reorg_box.add(self.reorg_switch)
         reorg_box.add(batch_label)
         reorg_box.add(self.batch_size_input)
-        main_box.add(reorg_box)
+        content_box.add(reorg_box)
 
-        main_box.add(toga.Divider(margin_top=10, margin_bottom=10))
+        content_box.add(toga.Divider(margin_top=10, margin_bottom=10))
 
         # Running Tally
-        tally_box = toga.Box(style=Pack(margin_top=10))
-        self.folders_processed_label = toga.Label(
-            "Folders Processed: 0", font_weight="bold", font_size=10, flex=1
-        )
-        self.files_kept_label = toga.Label(
-            "Files Kept: 0",
-            style=Pack(margin_left=20),
-            font_weight="bold",
-            font_size=10,
-            flex=1,
-        )
-        self.files_deleted_label = toga.Label(
-            "Files Deleted: 0",
-            style=Pack(margin_left=20, font_weight="bold", font_size=10, flex=1),
-        )
-        self.space_saved_label = toga.Label(
-            "Space Saved: 0 B",
-            style=Pack(
-                margin_left=20,
-                font_weight="bold",
-                font_size=10,
-                flex=1,
-                margin_right=20,
-            ),
-        )
-        tally_box.add(self.folders_processed_label)
-        tally_box.add(self.files_kept_label)
-        tally_box.add(self.files_deleted_label)
-        tally_box.add(self.space_saved_label)
+        tally_row = toga.Box(style=Pack(direction="row", margin_top=8))
 
-        main_box.add(tally_box)
+        def stat(title: str) -> tuple[toga.Box, toga.Label]:
+            title_lbl = toga.Label(title, style=Pack(font_size=9, color="#9aa0a6"))
+            value_lbl = toga.Label(
+                "0", style=Pack(font_weight="bold", font_family="monospace")
+            )
+            col = toga.Box(style=Pack(direction="column", flex=1, margin_right=10))
+            col.add(title_lbl)
+            col.add(value_lbl)
+            return col, value_lbl
+
+        col1, self.folders_processed_value = stat("Folders Processed")
+        col2, self.files_kept_value = stat("Files Kept")
+        col3, self.files_deleted_value = stat("Files Deleted")
+        col4, self.space_saved_value = stat("Space Saved")
+        tally_row.add(col1)
+        tally_row.add(col2)
+        tally_row.add(col3)
+        tally_row.add(col4)
+
+        content_box.add(tally_row)
 
         # Progress bar
         self.progress_bar = toga.ProgressBar(max=100, value=0)
         self.progress_bar.style.visibility = "hidden"
-        main_box.add(self.progress_bar)
+        content_box.add(self.progress_bar)
 
-        main_box.add(toga.Divider(margin_top=20, margin_bottom=10))
+        content_box.add(toga.Divider(margin_top=20, margin_bottom=10))
 
         # Status area (one label)
         status_box = toga.Box(
@@ -261,8 +270,8 @@ class PhotoRecCleanerApp(toga.App):
             content=status_box, horizontal=False, vertical=True
         )
 
-        main_box.add(scroll_container)
-        main_box.add(toga.Divider(margin_top=10, margin_bottom=10))
+        content_box.add(scroll_container)
+        content_box.add(toga.Divider(margin_top=10, margin_bottom=10))
 
         # Action buttons
         action_box = toga.Box(
@@ -301,7 +310,10 @@ class PhotoRecCleanerApp(toga.App):
         action_box.add(self.cancel_button)
         action_box.add(self.live_monitor_button)
         action_box.add(self.process_button)
-        main_box.add(action_box)
+        content_box.add(action_box)
+
+        # Add padded content to the outer main box
+        main_box.add(content_box)
 
         self.main_box = main_box
 
@@ -333,9 +345,9 @@ class PhotoRecCleanerApp(toga.App):
 
         # Help text box
         heading_label = toga.Label(
-            heading, style=Pack(padding=(10, 10), font_weight="bold", font_size=16)
+            heading, style=Pack(margin=(10, 10), font_weight="bold", font_size=16)
         )
-        text_label = toga.Label(message, style=Pack(padding=(0, 10)))
+        text_label = toga.Label(message, style=Pack(margin=(0, 10)))
         content_box = toga.Box(style=Pack(direction="column", flex=1))
         content_box.add(heading_label)
         content_box.add(text_label)
@@ -349,7 +361,7 @@ class PhotoRecCleanerApp(toga.App):
             with contextlib.suppress(Exception):
                 webbrowser.open(url)
 
-        links_box = toga.Box(style=Pack(direction="row", padding=10))
+        links_box = toga.Box(style=Pack(direction="row", margin=10))
         email_btn = toga.Button(
             "Email",
             on_press=lambda w: _open(
@@ -393,6 +405,97 @@ class PhotoRecCleanerApp(toga.App):
         self.keep_ext_input.enabled = self.cleaning_switch.value
         self.exclude_ext_input.enabled = self.cleaning_switch.value
 
+    # Removed ghost-based styling; rely on placeholders while disabled
+
+    # --- Paths: getters that return full paths regardless of display truncation ---
+    def get_base_dir(self) -> str:
+        return self._dir_path_full or self.dir_path_input.value or ""
+
+    def get_log_dir(self) -> str:
+        return self._log_path_full or self.log_path_input.value or ""
+
+    # --- Path inputs: change handlers and display helpers ---
+    def _set_dir_display_from_full(self) -> None:
+        if not self._dir_path_full:
+            self.dir_path_input.value = ""
+            return
+        self._updating_dir_field = True
+        try:
+            self.dir_path_input.value = tail_truncate(self._dir_path_full, maxlen=80)
+        finally:
+            self._updating_dir_field = False
+
+    def _set_log_display_from_full(self) -> None:
+        if not self._log_path_full:
+            self.log_path_input.value = ""
+            return
+        self._updating_log_field = True
+        try:
+            self.log_path_input.value = tail_truncate(self._log_path_full, maxlen=80)
+        finally:
+            self._updating_log_field = False
+
+    def on_dir_path_changed(self, widget: toga.TextInput) -> None:
+        if self._updating_dir_field:
+            return
+        full = (widget.value or "").strip()
+        self._dir_path_full = full
+        # If it's a valid directory, wire up the cleaner and polling
+        if full and Path(full).is_dir():
+            self.controller.set_cleaner(full)
+            self.controller.start_folder_polling()
+            self._update_start_button_state()
+
+    def on_log_path_changed(self, widget: toga.TextInput) -> None:
+        if self._updating_log_field:
+            return
+        full = (widget.value or "").strip()
+        self._log_path_full = full
+
+    # --- ProgressBar appearance ---
+    def set_progress_color(self, color_name: str | None) -> None:
+        """Optionally tint the progress bar (best-effort; platform-dependent)."""
+        try:
+            if color_name == "green":
+                # Prefer tinting the bar, not the background, if supported
+                with contextlib.suppress(Exception):
+                    self.progress_bar.style.color = (
+                        "#2e7d32"  # bar color (backend-dependent)
+                    )
+                # Reset background to default to emphasize bar
+                self.progress_bar.style.background_color = None  # type: ignore[assignment]
+            else:
+                # Reset to default style
+                self.progress_bar.style.background_color = None  # type: ignore[assignment]
+                with contextlib.suppress(Exception):
+                    self.progress_bar.style.color = None  # type: ignore[assignment]
+        except Exception:
+            # Some backends may not support setting colors on native widgets
+            pass
+
+    # --- Platform styling ---
+    def _apply_platform_theme(self) -> None:
+        """Apply a dark theme on all platforms."""
+        try:
+            dark_bg = "#1e1e1e"
+            light_fg = "#e0e0e0"
+            # Backgrounds
+            self.main_box.style.background_color = dark_bg
+            # Key labels
+            self.folders_processed_value.color = light_fg
+            self.files_kept_value.color = light_fg
+            self.files_deleted_value.color = light_fg
+            self.space_saved_value.color = light_fg
+            self.guidance_label.color = light_fg
+            # Inputs (best-effort)
+            self.dir_path_input.style.background_color = "#2b2b2b"
+            self.dir_path_input.style.color = light_fg
+            self.log_path_input.style.background_color = "#2b2b2b"
+            self.log_path_input.style.color = light_fg
+        except Exception:
+            # If any of these style tweaks aren't supported on the backend, ignore silently.
+            pass
+
     def _update_start_button_state(self, widget: object = None) -> None:
         is_directory_selected = bool(self.dir_path_input.value)
         is_any_option_selected = (
@@ -404,8 +507,9 @@ class PhotoRecCleanerApp(toga.App):
             is_directory_selected and is_any_option_selected
         )
 
-    async def toggle_cleaning_controls(self, widget: toga.Switch) -> None:
-        if widget.value:
+    async def toggle_cleaning_controls(self, deleteSwitch: toga.Switch) -> None:
+        # Confirm once per app session
+        if deleteSwitch.value and not self._suppress_delete_warning:
             confirmed = await self.main_window.dialog(  # type: ignore[attr-defined]
                 toga.ConfirmDialog(
                     "Confirm Permanent Deletion",
@@ -413,20 +517,42 @@ class PhotoRecCleanerApp(toga.App):
                 )
             )
             if not confirmed:
-                widget.value = False
+                deleteSwitch.value = False
+                return
+            self._suppress_delete_warning = True
 
-        self.keep_ext_input.enabled = widget.value
-        self.exclude_ext_input.enabled = widget.value
-        # If enabling deletion, clear the example values to let user choose
-        if widget.value:
-            self.keep_ext_input.value = ""
-            self.exclude_ext_input.value = ""
+        default_keep_ph = "gz\nsqlite"
+        default_excl_ph = "html.gz\nxml.gz"
+
+        self.keep_ext_input.enabled = deleteSwitch.value
+        self.exclude_ext_input.enabled = deleteSwitch.value
+        # If enabling deletion, clear the placeholders
+        if deleteSwitch.value:
+            if self.keep_ext_input.placeholder != default_keep_ph:
+                self.keep_ext_input.value = self.keep_ext_input.placeholder
+            else:
+                self.keep_ext_input.value = ""
+            if self.exclude_ext_input.placeholder != default_excl_ph:
+                self.exclude_ext_input.value = self.exclude_ext_input.placeholder
+            else:
+                self.exclude_ext_input.value = ""
+            self.keep_ext_input.placeholder = ""
+            self.exclude_ext_input.placeholder = ""
         else:
             # If disabling, restore examples if fields are empty
-            if not self.keep_ext_input.value:
-                self.keep_ext_input.value = "gz,sqlite"
-            if not self.exclude_ext_input.value:
-                self.exclude_ext_input.value = "html.gz,xml.gz"
+            if not self.keep_ext_input.value.strip():
+                self.keep_ext_input.placeholder = default_keep_ph
+            if not self.exclude_ext_input.value.strip():
+                self.exclude_ext_input.placeholder = default_excl_ph
+            if self.keep_ext_input.value.strip():
+                self.keep_ext_input.placeholder = self.keep_ext_input.value.strip()
+            if self.exclude_ext_input.value.strip():
+                self.exclude_ext_input.placeholder = (
+                    self.exclude_ext_input.value.strip()
+                )
+            self.keep_ext_input.value = ""
+            self.exclude_ext_input.value = ""
+
         self._update_start_button_state()
 
     def toggle_log_path(self, widget: toga.Switch) -> None:
@@ -442,7 +568,8 @@ class PhotoRecCleanerApp(toga.App):
                 )
             )
             if path:
-                self.log_path_input.value = str(path)
+                self._log_path_full = str(path)
+                self._set_log_display_from_full()
         except ValueError:
             await self.main_window.dialog(  # type: ignore[attr-defined]
                 toga.InfoDialog("Cancelled", "Log folder selection was cancelled.")
@@ -456,9 +583,12 @@ class PhotoRecCleanerApp(toga.App):
                 )
             )
             if path:
-                self.dir_path_input.value = str(path)
-                self.log_path_input.value = str(path)
-                self.controller.set_cleaner(str(path))
+                # Store full paths, but display short versions
+                self._dir_path_full = str(path)
+                self._log_path_full = str(path)
+                self._set_dir_display_from_full()
+                self._set_log_display_from_full()
+                self.controller.set_cleaner(self._dir_path_full)
                 self.controller.start_folder_polling()
                 self._update_start_button_state()
 
@@ -522,18 +652,14 @@ class PhotoRecCleanerApp(toga.App):
         # Keep status concise to avoid layout thrashing
         if self.drop_updates or self.app_state.cancelled:
             return
-        self.status_label.text = shorten_path(message, maxlen=120)
+        self.status_label.text = tail_truncate(message, maxlen=120)
 
     def update_tally(self) -> None:
-        self.folders_processed_label.text = (
-            f"Folders Processed: {len(self.app_state.cleaned_folders)}"
-        )
-        self.files_kept_label.text = f"Files Kept: {self.app_state.total_kept_count}"
-        self.files_deleted_label.text = (
-            f"Files Deleted: {self.app_state.total_deleted_count}"
-        )
-        self.space_saved_label.text = (
-            f"Space Saved: {self._format_size(self.app_state.total_deleted_size)}"
+        self.folders_processed_value.text = f"{len(self.app_state.cleaned_folders)}"
+        self.files_kept_value.text = f"{self.app_state.total_kept_count}"
+        self.files_deleted_value.text = f"{self.app_state.total_deleted_count}"
+        self.space_saved_value.text = (
+            f"{self._format_size(self.app_state.total_deleted_size)}"
         )
 
     def _format_size(self, size_bytes: int) -> str:
@@ -569,7 +695,7 @@ class PhotoRecCleanerApp(toga.App):
             self._show_final_report()
 
         # get_recup_dirs can be slow, run it in a thread
-        base_dir = self.dir_path_input.value
+        base_dir = self.get_base_dir()
         recup_dirs = await asyncio.to_thread(get_recup_dirs, base_dir)
         self.process_button.enabled = bool(recup_dirs)
 
@@ -638,6 +764,7 @@ class PhotoRecCleanerApp(toga.App):
             self.active_task = asyncio.create_task(self.clean_now_handler(None))
 
     def _show_final_report(self) -> None:
+        """Show the original compact popup report with prior logic."""
         report_title = "Processing Complete"
         report_body = (
             f"Photorec Cleaning Complete\n\n"
@@ -669,7 +796,7 @@ class PhotoRecCleanerApp(toga.App):
         # called from file_utils cleaners which might run in the main thread
         if self.drop_updates or self.app_state.cancelled:
             return
-        self.status_label.text = shorten_path(message, maxlen=120)
+        self.status_label.text = tail_truncate(message, maxlen=120)
 
     async def _update_tally_async(self) -> None:
         """Async version of update_tally to be called from other threads."""
@@ -681,7 +808,7 @@ class PhotoRecCleanerApp(toga.App):
         """Async version of setting status text to be called from other threads."""
         if self.drop_updates or self.app_state.cancelled:
             return
-        self.status_label.text = shorten_path(message, maxlen=120)
+        self.status_label.text = tail_truncate(message, maxlen=120)
 
     async def _show_dialog_async(self, title: str, message: str) -> None:
         """Creates and shows a dialog from a coroutine, ensuring it's on the main thread."""
