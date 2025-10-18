@@ -508,26 +508,24 @@ class PhotoRecCleanerApp(toga.App):
         )
 
     async def toggle_cleaning_controls(self, deleteSwitch: toga.Switch) -> None:
-        # Confirm once per app session
-        if deleteSwitch.value and not self._suppress_delete_warning:
-            confirmed = await self.main_window.dialog(  # type: ignore[attr-defined]
-                toga.ConfirmDialog(
-                    "Confirm Permanent Deletion",
-                    "Are you sure you want to enable file deletion? This action is permanent and cannot be undone.",
-                )
-            )
-            if not confirmed:
-                deleteSwitch.value = False
-                return
-            self._suppress_delete_warning = True
-
         default_keep_ph = "gz\nsqlite"
         default_excl_ph = "html.gz\nxml.gz"
 
-        self.keep_ext_input.enabled = deleteSwitch.value
-        self.exclude_ext_input.enabled = deleteSwitch.value
-        # If enabling deletion, clear the placeholders
+        # Confirm once per app session
         if deleteSwitch.value:
+            if not self._suppress_delete_warning:
+                confirmed = await self.main_window.dialog(  # type: ignore[attr-defined]
+                    toga.ConfirmDialog(
+                        "Confirm Permanent Deletion",
+                        "Are you sure you want to enable file deletion? This action is permanent and cannot be undone.",
+                    )
+                )
+                if not confirmed:
+                    deleteSwitch.value = False
+                    return
+                self._suppress_delete_warning = True
+
+            # If enabling deletion, clear the placeholders
             if self.keep_ext_input.placeholder != default_keep_ph:
                 self.keep_ext_input.value = self.keep_ext_input.placeholder
             else:
@@ -536,17 +534,19 @@ class PhotoRecCleanerApp(toga.App):
                 self.exclude_ext_input.value = self.exclude_ext_input.placeholder
             else:
                 self.exclude_ext_input.value = ""
-            self.keep_ext_input.placeholder = ""
             self.exclude_ext_input.placeholder = ""
+            self.keep_ext_input.placeholder = ""
+            self.keep_ext_input.enabled = self.exclude_ext_input.enabled = True
         else:
+            self.keep_ext_input.enabled = self.exclude_ext_input.enabled = False
             # If disabling, restore examples if fields are empty
             if not self.keep_ext_input.value.strip():
                 self.keep_ext_input.placeholder = default_keep_ph
+            else:
+                self.keep_ext_input.placeholder = self.keep_ext_input.value.strip()
             if not self.exclude_ext_input.value.strip():
                 self.exclude_ext_input.placeholder = default_excl_ph
-            if self.keep_ext_input.value.strip():
-                self.keep_ext_input.placeholder = self.keep_ext_input.value.strip()
-            if self.exclude_ext_input.value.strip():
+            else:
                 self.exclude_ext_input.placeholder = (
                     self.exclude_ext_input.value.strip()
                 )
