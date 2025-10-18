@@ -4,7 +4,8 @@ version = "1.0.0"
 description = "A tool to clean and organize PhotoRec output directories."
 requires-python = ">=3.10"
 dependencies = [
-    "toga",
+    # Target Toga 0.5.x APIs across platforms
+    "toga>=0.5.2",
 ]
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -77,21 +78,24 @@ test_sources = ["tests"]
 startup_module = "photorec_refinery.gui"
 
 requires = [
-    "toga>=0.4.0",
+    # Keep core Toga aligned on 0.5.x across platforms
+    "toga>=0.5.2",
 ]
 
 [tool.briefcase.app.photorec-refinery.macOS]
 requires = [
-    "toga-cocoa>=0.4.0",
+    "toga-cocoa>=0.5.2",
 ]
 
 [tool.briefcase.app.photorec-refinery.linux]
 requires = [
-    "toga-gtk>=0.4.0",
+    "toga-gtk>=0.5.2",
 ]
 
 [tool.briefcase.app.photorec-refinery.windows]
 requires = [
-    "toga-winforms>=0.4.0",
+    # WinForms 0.5.x; ensure pythonnet present for CLR hosting
+    "toga-winforms>=0.5.2",
+    "pythonnet>=3.0.1",
 ]
 system_installer = true
