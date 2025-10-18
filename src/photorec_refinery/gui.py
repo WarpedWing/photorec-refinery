@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import webbrowser
+from enum import Enum, StrEnum
 from pathlib import Path
 
 import toga
@@ -459,16 +460,18 @@ class PhotoRecCleanerApp(toga.App):
             if color_name == "green":
                 # Prefer tinting the bar, not the background, if supported
                 with contextlib.suppress(Exception):
-                    self.progress_bar.style.color = (
-                        "#2e7d32"  # bar color (backend-dependent)
-                    )
+                    # bar color (backend-dependent)
+                    self.progress_bar.style.color = "#2e7d32"
                 # Reset background to default to emphasize bar
-                self.progress_bar.style.background_color = None  # type: ignore[assignment]
+                # type: ignore[assignment]
+                self.progress_bar.style.background_color = None
             else:
                 # Reset to default style
-                self.progress_bar.style.background_color = None  # type: ignore[assignment]
+                # type: ignore[assignment]
+                self.progress_bar.style.background_color = None
                 with contextlib.suppress(Exception):
-                    self.progress_bar.style.color = None  # type: ignore[assignment]
+                    # type: ignore[assignment]
+                    self.progress_bar.style.color = None
         except Exception:
             # Some backends may not support setting colors on native widgets
             pass
@@ -511,8 +514,57 @@ class PhotoRecCleanerApp(toga.App):
         default_keep_ph = "gz\nsqlite"
         default_excl_ph = "html.gz\nxml.gz"
 
-        # Confirm once per app session
+        class ResetT(Enum):
+            BLANK = 1
+            DEFAULT = 2
+            SETVAL = 3
+
+        class TargetT(StrEnum):
+            PH = "placeholder"
+            IN = "value"
+
+        class Input(StrEnum):
+            KP = "keep"
+            EX = "exclude"
+
+        def _set_input(
+            Input: Input,
+            target: TargetT,
+            reset_type: ResetT,
+            setString: str | None = None,
+        ) -> None:
+            # Sets either the placeholder or input value
+            # to either the default, blank, or a specified string
+            match Input, reset_type, setString:
+                case (Input.KP, ResetT.BLANK, None):
+                    setattr(self.keep_ext_input, target, "")
+                case (Input.KP, ResetT.DEFAULT, None):
+                    setattr(self.keep_ext_input, target, default_keep_ph)
+                case (Input.KP, ResetT.SETVAL, _):
+                    setattr(self.keep_ext_input, target, setString.strip())
+                case (Input.EX, ResetT.BLANK, None):
+                    setattr(self.exclude_ext_input, target, "")
+                case (Input.EX, ResetT.DEFAULT, None):
+                    setattr(self.exclude_ext_input, target, default_excl_ph)
+                case (Input.EX, ResetT.SETVAL, _):
+                    setattr(self.exclude_ext_input, target, setString.strip())
+
+        def _is_default_placeholder(inputType: Input) -> bool:
+            # If the placeholder matches the default, return true
+            match inputType:
+                case Input.KP:
+                    return self.keep_ext_input.placeholder == default_keep_ph
+                case Input.EX:
+                    return self.exclude_ext_input.placeholder == default_excl_ph
+
+        def _set_input_state(state: bool) -> None:
+            # Enable or disable both input fields
+            self.keep_ext_input.enabled = state
+            self.exclude_ext_input.enabled = state
+
+        # Delete selected ON
         if deleteSwitch.value:
+            # Confirm deletion once per app session
             if not self._suppress_delete_warning:
                 confirmed = await self.main_window.dialog(  # type: ignore[attr-defined]
                     toga.ConfirmDialog(
@@ -525,33 +577,54 @@ class PhotoRecCleanerApp(toga.App):
                     return
                 self._suppress_delete_warning = True
 
-            # If enabling deletion, clear the placeholders
-            if self.keep_ext_input.placeholder != default_keep_ph:
-                self.keep_ext_input.value = self.keep_ext_input.placeholder
+            # If enabling deletion, clear the default placeholders
+            # If user data is in either field, restore placeholders to values
+            if _is_default_placeholder(Input.KP):
+                _set_input(Input.KP, TargetT.IN, ResetT.BLANK)
             else:
-                self.keep_ext_input.value = ""
-            if self.exclude_ext_input.placeholder != default_excl_ph:
-                self.exclude_ext_input.value = self.exclude_ext_input.placeholder
-            else:
-                self.exclude_ext_input.value = ""
-            self.exclude_ext_input.placeholder = ""
-            self.keep_ext_input.placeholder = ""
-            self.keep_ext_input.enabled = self.exclude_ext_input.enabled = True
-        else:
-            self.keep_ext_input.enabled = self.exclude_ext_input.enabled = False
-            # If disabling, restore examples if fields are empty
-            if not self.keep_ext_input.value.strip():
-                self.keep_ext_input.placeholder = default_keep_ph
-            else:
-                self.keep_ext_input.placeholder = self.keep_ext_input.value.strip()
-            if not self.exclude_ext_input.value.strip():
-                self.exclude_ext_input.placeholder = default_excl_ph
-            else:
-                self.exclude_ext_input.placeholder = (
-                    self.exclude_ext_input.value.strip()
+                _set_input(
+                    Input.KP,
+                    TargetT.IN,
+                    ResetT.SETVAL,
+                    self.keep_ext_input.placeholder,
                 )
-            self.keep_ext_input.value = ""
-            self.exclude_ext_input.value = ""
+            if _is_default_placeholder(Input.EX):
+                _set_input(Input.EX, TargetT.IN, ResetT.BLANK)
+            else:
+                _set_input(
+                    Input.EX,
+                    TargetT.IN,
+                    ResetT.SETVAL,
+                    self.exclude_ext_input.placeholder,
+                )
+
+            # While delete is active, remove placeholders to reduce distraction
+            _set_input(Input.KP, TargetT.PH, ResetT.BLANK)
+            _set_input(Input.EX, TargetT.PH, ResetT.BLANK)
+            # Enable the input for the user
+            _set_input_state(True)
+
+        # If delete disabled
+        else:
+            # Turn off inputs
+            _set_input_state(False)
+            # If there's no user entry, restore default placeholdres
+            if not self.keep_ext_input.value.strip():
+                _set_input(Input.KP, TargetT.PH, ResetT.DEFAULT)
+            # If user entry exists, save user values in placeholder
+            else:
+                _set_input(
+                    Input.KP, TargetT.PH, ResetT.SETVAL, self.keep_ext_input.value
+                )
+            if not self.exclude_ext_input.value.strip():
+                _set_input(Input.EX, TargetT.PH, ResetT.DEFAULT)
+            else:
+                _set_input(
+                    Input.EX, TargetT.PH, ResetT.SETVAL, self.exclude_ext_input.value
+                )
+            # Finally, blank out the inputs
+            _set_input(Input.KP, TargetT.IN, ResetT.BLANK)
+            _set_input(Input.EX, TargetT.IN, ResetT.BLANK)
 
         self._update_start_button_state()
 
@@ -766,10 +839,7 @@ class PhotoRecCleanerApp(toga.App):
     def _show_final_report(self) -> None:
         """Show the original compact popup report with prior logic."""
         report_title = "Processing Complete"
-        report_body = (
-            f"Photorec Cleaning Complete\n\n"
-            f"Folders Processed: {len(self.app_state.cleaned_folders)}\n"
-        )
+        report_body = f"Photorec Cleaning Complete\n\nFolders Processed: {len(self.app_state.cleaned_folders)}\n"
         if self.app_state.total_deleted_count > 0:
             report_body += (
                 f"Files Kept: {self.app_state.total_kept_count}\n"
