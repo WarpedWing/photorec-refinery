@@ -66,14 +66,20 @@ If you prefer to run the app from source:
 
 #### Requirements
 
-- Python 3.8+
+- Python 3.10+
 - [UV](https://docs.astral.sh/uv/) (recommended) or pip
 
 #### Installation with UV
 
 ```bash
-# Install UV (if not already installed)
+# Install UV (if not already installed) with curl
 curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Or pip
+pipx install uv
+
+# Or Homebrew
+brew install uv
 
 # Clone the repository
 git clone https://github.com/WarpedWing/photorec-refinery.git
@@ -105,7 +111,7 @@ photorec-refinery-gui
 1. **Select the PhotoRec Output Directory** – The folder that contains `recup_dir.1`, `recup_dir.2`, ...
 2. **Set Filtering Options**
    - Toggle **Enable File Deletion** to activate filtering
-   - Enter comma‑separated extensions without dots: `jpg,png,pdf` (not `.jpg, .png`)
+   - Enter comma-separated (or return‑separated) extensions without dots: `jpg,png,pdf` (not `.jpg, .png`)
       - _Only **Keep** filled in_
          - Keep types will be saved, all other files will be deleted.
       - _Only **Exclude** filled in_
@@ -125,7 +131,7 @@ photorec-refinery-gui
 
 ## Building from Source
 
-To build the application yourself (requires Python 3.8+):
+To build the application yourself (requires Python 3.10+):
 
 ```bash
 # Install UV
@@ -144,53 +150,6 @@ uv run briefcase package
 ```
 
 The packaged app will be in the `dist/` directory.
-
-## Tips & Troubleshooting
-
-### macOS: "App is damaged and can't be opened"
-
-This happens due to Gatekeeper quarantine. Run:
-
-```bash
-sudo xattr -rd com.apple.quarantine "/Applications/PhotoRec Refinery.app"
-```
-
-### macOS: "App can't be opened because it is from an unidentified developer"
-
-Right-click the app and select "Open", then click "Open" in the dialog.
-
-### Windows: SmartScreen warning
-
-Click "More info" then "Run anyway"
-
-### Windows: "photorec-refinery-gui program not found" when using uv
-
-On Windows, you need to explicitly install the package first before running the script:
-
-```bash
-# Install the package first
-uv pip install -e .
-
-# Then run the GUI
-uv run photorec-refinery-gui
-```
-
-Alternatively, you can run it as a Python module:
-
-```bash
-uv run python -m photorec_refinery
-```
-
-### App doesn't detect PhotoRec folders
-
-- Ensure you've selected the correct output directory (the one containing `recup_dir.1`, etc.)
-- Check that you have read/write permissions for the directory
-
-### Files aren't being filtered
-
-- Verify "Clean Files" is enabled
-- Check that you've entered at least one extension in either "Keep" or "Exclude"
-- Extensions should be entered without dots: `jpg png` not `.jpg .png`
 
 ## Contributing
 
