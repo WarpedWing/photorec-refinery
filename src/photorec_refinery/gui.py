@@ -478,26 +478,8 @@ class PhotoRecCleanerApp(toga.App):
 
     # --- Platform styling ---
     def _apply_platform_theme(self) -> None:
-        """Apply a dark theme on all platforms."""
-        try:
-            dark_bg = "#1e1e1e"
-            light_fg = "#e0e0e0"
-            # Backgrounds
-            self.main_box.style.background_color = dark_bg
-            # Key labels
-            self.folders_processed_value.color = light_fg
-            self.files_kept_value.color = light_fg
-            self.files_deleted_value.color = light_fg
-            self.space_saved_value.color = light_fg
-            self.guidance_label.color = light_fg
-            # Inputs (best-effort)
-            self.dir_path_input.style.background_color = "#2b2b2b"
-            self.dir_path_input.style.color = light_fg
-            self.log_path_input.style.background_color = "#2b2b2b"
-            self.log_path_input.style.color = light_fg
-        except Exception:
-            # If any of these style tweaks aren't supported on the backend, ignore silently.
-            pass
+        """Use native OS theming across all platforms (no custom overrides)."""
+        return
 
     def _update_start_button_state(self, widget: object = None) -> None:
         is_directory_selected = bool(self.dir_path_input.value)
