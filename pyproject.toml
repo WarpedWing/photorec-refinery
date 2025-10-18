@@ -1,6 +1,6 @@
 [project]
 name = "photorec-refinery"
-version = "0.5.0"
+version = "1.0.0"
 description = "A tool to clean and organize PhotoRec output directories."
 requires-python = ">=3.10"
 dependencies = [
@@ -58,7 +58,7 @@ dev = [
 [tool.briefcase]
 project_name = "PhotoRec Refinery"
 bundle = "com.photorec-refinery"
-version = "0.5.0"
+version = "1.0.0"
 url = "https://github.com/WarpedWing/photorec-refinery"
 author = "WarpedWing Labs"
 author_email = "noel@warpedwinglabs.com"
