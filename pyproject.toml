@@ -2,7 +2,7 @@
 name = "photorec-refinery"
 version = "0.5.0"
 description = "A tool to clean and organize PhotoRec output directories."
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 dependencies = [
     "toga",
 ]
