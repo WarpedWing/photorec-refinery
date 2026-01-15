@@ -1,0 +1,63 @@
+name: Build Installers
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            platform: macOS
+            artifact_path: dist/*.dmg
+          - os: ubuntu-22.04
+            platform: linux
+            artifact_path: dist/*.deb
+          - os: windows-latest
+            platform: windows
+            artifact_path: dist/*.msi
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install Linux dependencies
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgirepository1.0-dev \
+            libcairo2-dev \
+            libpango1.0-dev \
+            libwebkit2gtk-4.1-dev \
+            gir1.2-gtk-3.0 \
+            gir1.2-webkit2-4.1
+
+      - name: Install Briefcase
+        run: pip install briefcase
+
+      - name: Create app
+        run: briefcase create
+
+      - name: Build app
+        run: briefcase build
+
+      - name: Package app
+        run: briefcase package --adhoc-sign
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: photorec-refinery-${{ matrix.platform }}
+          path: ${{ matrix.artifact_path }}
+          if-no-files-found: error
