@@ -15,7 +15,7 @@ jobs:
             artifact_path: dist/*.dmg
           - os: ubuntu-22.04
             platform: linux
-            artifact_path: dist/*.AppImage
+            artifact_path: dist/*.flatpak
           - os: windows-latest
             platform: windows
             artifact_path: dist/*.msi
@@ -35,37 +35,32 @@ jobs:
         if: matrix.platform == 'linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            libgirepository1.0-dev \
-            libcairo2-dev \
-            libpango1.0-dev \
-            libwebkit2gtk-4.1-dev \
-            gir1.2-gtk-3.0 \
-            gir1.2-webkit2-4.1 \
-            libfuse2
+          sudo apt-get install -y flatpak flatpak-builder
+          sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          sudo flatpak install -y flathub org.gnome.Sdk//47 org.gnome.Platform//47
 
       - name: Install Briefcase
         run: pip install briefcase
 
-      - name: Create app (Linux AppImage)
+      - name: Create app (Linux Flatpak)
         if: matrix.platform == 'linux'
-        run: briefcase create linux appimage
+        run: briefcase create linux flatpak
 
       - name: Create app (other platforms)
         if: matrix.platform != 'linux'
         run: briefcase create
 
-      - name: Build app (Linux AppImage)
+      - name: Build app (Linux Flatpak)
         if: matrix.platform == 'linux'
-        run: briefcase build linux appimage
+        run: briefcase build linux flatpak
 
       - name: Build app (other platforms)
         if: matrix.platform != 'linux'
         run: briefcase build
 
-      - name: Package app (Linux AppImage)
+      - name: Package app (Linux Flatpak)
         if: matrix.platform == 'linux'
-        run: briefcase package linux appimage
+        run: briefcase package linux flatpak
 
       - name: Package app (other platforms)
         if: matrix.platform != 'linux'
