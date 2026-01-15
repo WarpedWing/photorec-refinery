@@ -83,10 +83,10 @@ class PhotoRecCleanerApp(toga.App):
 
     def build_ui(self) -> None:
         # load logo
-        photorec_cleaner_logo = toga.Image("resources/WarpedWingLabsLogo_Horizontal_Compressed_W500_blur.png")
+        photorec_cleaner_logo = toga.Image("resources/WarpedWingLabs_Logo_800x300.png")
 
         header_box = toga.Box(style=Pack(direction="row", margin=5, flex=1))
-        header_box.add(toga.ImageView(photorec_cleaner_logo, height=75, margin_bottom=10))
+        header_box.add(toga.ImageView(photorec_cleaner_logo, height=100, margin_bottom=0))
 
         # Help button
         # spacer to push Help right

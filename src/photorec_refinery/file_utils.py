@@ -56,7 +56,12 @@ def clean_folder(folder, state, keep_ext=None, exclude_ext=None, logger=None, pr
             lower_f = f.lower()
 
             # Determine the primary extension for organization and logging
-            primary_ext = Path(lower_f).suffix[1:] if "." in lower_f else ""
+            # Extensionless files go to "unknown" folder
+            primary_ext = Path(lower_f).suffix[1:] if "." in lower_f else "unknown"
+
+            # Keep SQLite associated files (.shm, .wal, .journal) with their parent
+            if any(lower_f.endswith(f".sqlite-{ext}") for ext in ("shm", "wal", "journal")):
+                primary_ext = "sqlite"
 
             # Default to keeping the file if no keep rules are specified.
             # If keep_ext is a non-empty set, default to deleting.
@@ -186,6 +191,30 @@ def organize_by_type(base_dir, state, batch_size=500, progress_cb=None):
     if progress_cb and total_to_move > 0:
         with contextlib.suppress(Exception):
             progress_cb(0, total_to_move)
+
+    # Move PhotoRec's carve report.xml to root directory instead of xml folder
+    if "xml" in state.kept_files:
+        xml_paths = state.kept_files["xml"]
+        paths_to_remove = []
+        for path in xml_paths:
+            if Path(path).name.lower() == "report.xml":
+                # Check if it's PhotoRec's carve report
+                try:
+                    with Path(path).open(encoding="utf-8") as f:
+                        content = f.read(1024)  # Read first 1KB
+                        if "<dc:type>Carve Report</dc:type>" in content:
+                            shutil.move(path, base_path)
+                            moved_overall += 1
+                            if progress_cb and total_to_move > 0:
+                                with contextlib.suppress(Exception):
+                                    progress_cb(moved_overall, total_to_move)
+                            paths_to_remove.append(path)
+                except (OSError, UnicodeDecodeError):
+                    pass  # Skip if can't read or move
+        # Remove processed paths from xml list
+        for path in paths_to_remove:
+            xml_paths.remove(path)
+
     for ext, paths in state.kept_files.items():
         if state.cancelled:
             raise OperationCancelled()
