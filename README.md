@@ -39,8 +39,9 @@ Download the latest release for your platform from the [Releases](https://github
 
 - **macOS**: Download `PhotoRec-Refinery-X.X.X.dmg`
 - **Windows**: Download `PhotoRec-Refinery-X.X.X.msi`
+- **Linux**: Download `PhotoRec-Refinery-X.X.X.flatpak`
 
-#### Running on macOS (Unsigned App)
+#### macOS (Unsigned App)
 
 Since the app is not signed with an Apple Developer certificate, macOS Gatekeeper will prevent it from opening. To run the app:
 
@@ -60,6 +61,31 @@ If you see "damaged app" warnings, run:
 sudo xattr -rd com.apple.quarantine "/Applications/PhotoRec Refinery.app"
 ```
 
+#### Windows
+
+The `.msi` installer is not code-signed, so Windows SmartScreen may show a warning:
+
+1. Click "More info" on the SmartScreen dialog
+2. Click "Run anyway" to proceed with installation
+3. The app will install normally after this
+
+#### Linux (Flatpak)
+
+Install the Flatpak package:
+
+```bash
+# Install Flatpak if not already installed (Debian/Ubuntu)
+sudo apt install flatpak
+
+# Install the app
+flatpak install PhotoRec-Refinery-X.X.X.flatpak
+
+# Run the app
+flatpak run com.photorec-refinery.photorec-refinery
+```
+
+Alternatively, on systems with GTK3 and Python 3.13+, you can run from source (see below).
+
 ### Option 2: Run from Source
 
 If you prefer to run the app from source:
@@ -68,6 +94,13 @@ If you prefer to run the app from source:
 
 - Python 3.13+
 - [UV](https://docs.astral.sh/uv/) (recommended) or pip
+- **Linux only**: GTK3 and GObject introspection libraries
+
+**Linux dependencies** (Debian/Ubuntu):
+
+```bash
+sudo apt install libgirepository1.0-dev libcairo2-dev libpango1.0-dev gir1.2-gtk-3.0
+```
 
 #### Installation with UV
 
