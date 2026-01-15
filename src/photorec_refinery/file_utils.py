@@ -18,9 +18,7 @@ class OperationCancelled(Exception):
     pass
 
 
-def clean_folder(
-    folder, state, keep_ext=None, exclude_ext=None, logger=None, prefix="Processing"
-):
+def clean_folder(folder, state, keep_ext=None, exclude_ext=None, logger=None, prefix="Processing"):
     """
     Walks through a folder, deleting or keeping files based on extension rules.
 
@@ -96,9 +94,7 @@ def clean_folder(
                     path.unlink()
                     state.total_deleted_count += 1
                     state.total_deleted_size += size
-                    log_action(
-                        state, folder_name, f, primary_ext, "deleted", str(path), size
-                    )
+                    log_action(state, folder_name, f, primary_ext, "deleted", str(path), size)
                     if logger:
                         logger(f"Deleted: {f}")
                 except OSError:

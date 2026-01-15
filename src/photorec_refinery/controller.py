@@ -98,9 +98,7 @@ class AppController:
                 # The file handle needs to be kept open.
                 self.app_state.log_file_handle = log_filepath.open("w", newline="")
                 self.app_state.log_writer = csv.writer(self.app_state.log_file_handle)
-                self.app_state.log_writer.writerow(
-                    ["Folder", "Filename", "Extension", "Status", "Size"]
-                )
+                self.app_state.log_writer.writerow(["Folder", "Filename", "Extension", "Status", "Size"])
             except OSError as e:
                 self.app.status_label.text = f"Error creating log file: {e}"
 
@@ -114,9 +112,7 @@ class AppController:
                     continue
 
                 # Check for folders. If none, set status and wait.
-                recup_dirs = await asyncio.to_thread(
-                    get_recup_dirs, self.cleaner.base_dir
-                )
+                recup_dirs = await asyncio.to_thread(get_recup_dirs, self.cleaner.base_dir)
                 if not recup_dirs:
                     self.app.status_label.text = "Monitoring..."
                     self.app.update_tally()
@@ -127,15 +123,9 @@ class AppController:
                     self.app.status_label.text = "Processing..."
 
                 # Pass empty strings for extensions if cleaning is disabled
-                keep_csv = (
-                    self._csv_from_exts(self.app.keep_ext_input.value)
-                    if self.app.cleaning_switch.value
-                    else ""
-                )
+                keep_csv = self._csv_from_exts(self.app.keep_ext_input.value) if self.app.cleaning_switch.value else ""
                 exclude_csv = (
-                    self._csv_from_exts(self.app.exclude_ext_input.value)
-                    if self.app.cleaning_switch.value
-                    else ""
+                    self._csv_from_exts(self.app.exclude_ext_input.value) if self.app.cleaning_switch.value else ""
                 )
 
                 # run_once will now handle both processing completed folders and
@@ -196,20 +186,10 @@ class AppController:
             last_folder = recup_dirs[-1]
             if last_folder not in self.app_state.cleaned_folders:
                 message = f"Processing final folder {tail_truncate(last_folder, 60)}..."
-                self.loop.call_soon_threadsafe(
-                    self.app._set_status_text_threadsafe, message
-                )
+                self.loop.call_soon_threadsafe(self.app._set_status_text_threadsafe, message)
                 # Respect the cleaning switch for the final pass
-                keep_ext_str = (
-                    self.app.keep_ext_input.value
-                    if self.app.cleaning_switch.value
-                    else ""
-                )
-                exclude_ext_str = (
-                    self.app.exclude_ext_input.value
-                    if self.app.cleaning_switch.value
-                    else ""
-                )
+                keep_ext_str = self.app.keep_ext_input.value if self.app.cleaning_switch.value else ""
+                exclude_ext_str = self.app.exclude_ext_input.value if self.app.cleaning_switch.value else ""
                 keep_ext = self._split_exts(keep_ext_str)
                 exclude_ext = self._split_exts(exclude_ext_str)
                 try:
@@ -225,17 +205,13 @@ class AppController:
                 self.app_state.cleaned_folders.add(last_folder)
                 self.loop.call_soon_threadsafe(self.app.update_tally)
                 steps_done += 1
-                self.loop.call_soon_threadsafe(
-                    self.app.update_progress, steps_done, total_steps
-                )
+                self.loop.call_soon_threadsafe(self.app.update_progress, steps_done, total_steps)
 
         if self.app.reorg_switch.value:
             if self.app_state.cancelled:
                 return
             message = "Reorganizing files..."
-            self.loop.call_soon_threadsafe(
-                self.app._set_status_text_threadsafe, message
-            )
+            self.loop.call_soon_threadsafe(self.app._set_status_text_threadsafe, message)
             batch_size = int(self.app.batch_size_input.value)
             # Switch progress bar to reorg mode (green) and use per-file progress
             try:
@@ -250,13 +226,9 @@ class AppController:
             except OperationCancelled:
                 return
             message = "Reorganization complete."
-            self.loop.call_soon_threadsafe(
-                self.app._set_status_text_threadsafe, message
-            )
+            self.loop.call_soon_threadsafe(self.app._set_status_text_threadsafe, message)
             steps_done += 1
-            self.loop.call_soon_threadsafe(
-                self.app.update_progress, steps_done, total_steps
-            )
+            self.loop.call_soon_threadsafe(self.app.update_progress, steps_done, total_steps)
             # restore default progress appearance
             self.loop.call_soon_threadsafe(self.app.set_progress_color, None)
 
@@ -269,9 +241,7 @@ class AppController:
 
         self._close_log_file()
         steps_done += 1
-        self.loop.call_soon_threadsafe(
-            self.app.update_progress, steps_done, total_steps
-        )
+        self.loop.call_soon_threadsafe(self.app.update_progress, steps_done, total_steps)
 
     def _close_log_file(self) -> None:
         """Closes the log file handle if it's open."""
@@ -311,21 +281,15 @@ class AppController:
         recup_dirs = get_recup_dirs(base_dir)
         if not recup_dirs:
             message = "No 'recup_dir' folders found to clean."
-            asyncio.run_coroutine_threadsafe(
-                self.app._set_status_text_async(message), loop
-            )
+            asyncio.run_coroutine_threadsafe(self.app._set_status_text_async(message), loop)
             return
 
         num_folders = len(recup_dirs)
         self.loop.call_soon_threadsafe(self.app.update_progress, 0, num_folders)
 
         # Respect the cleaning switch for the one-shot process
-        keep_ext_str = (
-            self.app.keep_ext_input.value if self.app.cleaning_switch.value else ""
-        )
-        exclude_ext_str = (
-            self.app.exclude_ext_input.value if self.app.cleaning_switch.value else ""
-        )
+        keep_ext_str = self.app.keep_ext_input.value if self.app.cleaning_switch.value else ""
+        exclude_ext_str = self.app.exclude_ext_input.value if self.app.cleaning_switch.value else ""
         keep_ext = self._split_exts(keep_ext_str)
         exclude_ext = self._split_exts(exclude_ext_str)
 
@@ -333,9 +297,7 @@ class AppController:
             if self.app_state.cancelled:
                 break
             message = f"Processing folder {i + 1}/{num_folders}..."
-            self.loop.call_soon_threadsafe(
-                self.app._set_status_text_threadsafe, message
-            )
+            self.loop.call_soon_threadsafe(self.app._set_status_text_threadsafe, message)
             try:
                 clean_folder(
                     folder,
@@ -357,9 +319,7 @@ class AppController:
 
         if self.app.reorg_switch.value:
             message = "Reorganizing files..."
-            self.loop.call_soon_threadsafe(
-                self.app._set_status_text_threadsafe, message
-            )
+            self.loop.call_soon_threadsafe(self.app._set_status_text_threadsafe, message)
             batch_size = int(self.app.batch_size_input.value)
             with contextlib.suppress(OperationCancelled):
                 # Show green progress and report per-file progress during reorg
@@ -372,9 +332,7 @@ class AppController:
                 )
                 self.loop.call_soon_threadsafe(self.app.set_progress_color, None)
             message = "Reorganization complete."
-            self.loop.call_soon_threadsafe(
-                self.app._set_status_text_threadsafe, message
-            )
+            self.loop.call_soon_threadsafe(self.app._set_status_text_threadsafe, message)
 
         if self.app_state.cancelled:
             self._close_log_file()
@@ -425,11 +383,7 @@ class AppController:
 
     def _logger_callback(self, message: str):
         """Callback from worker threads to update UI; coalesces messages."""
-        if (
-            not message
-            or self.app_state.cancelled
-            or getattr(self.app, "drop_updates", False)
-        ):
+        if not message or self.app_state.cancelled or getattr(self.app, "drop_updates", False):
             return
 
         # Ignore noisy per-file messages; keep high-level progress only
@@ -445,9 +399,7 @@ class AppController:
     def _flush_status_update(self) -> None:
         """Runs on the event loop to apply the latest status update once."""
         try:
-            if not self.app_state.cancelled and not getattr(
-                self.app, "drop_updates", False
-            ):
+            if not self.app_state.cancelled and not getattr(self.app, "drop_updates", False):
                 self.app.update_status(self._last_status_msg)
         finally:
             self._status_update_scheduled = False
@@ -480,11 +432,7 @@ class AppController:
             "total_space_saved_bytes",
             "total_space_saved_gb",
         ]
-        gb = (
-            self.app_state.total_deleted_size / (1024**3)
-            if self.app_state.total_deleted_size
-            else 0.0
-        )
+        gb = self.app_state.total_deleted_size / (1024**3) if self.app_state.total_deleted_size else 0.0
         row = [
             ts,
             str(base_dir),

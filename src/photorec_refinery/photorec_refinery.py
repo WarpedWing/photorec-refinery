@@ -55,11 +55,7 @@ class Cleaner:
             }
 
         active_folder = recup_dirs[-1]
-        folders_to_process = [
-            d
-            for d in recup_dirs
-            if d not in app_state.cleaned_folders and d != active_folder
-        ]
+        folders_to_process = [d for d in recup_dirs if d not in app_state.cleaned_folders and d != active_folder]
 
         # Process fully completed folders (safe to clean/delete)
         for folder in folders_to_process:

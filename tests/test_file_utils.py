@@ -67,9 +67,7 @@ class TestFileUtils(unittest.TestCase):
         self.assertEqual(state.total_kept_count, 3)
         self.assertEqual(state.total_deleted_count, 3)
         expected_deleted_size = (
-            self.files_to_create["archive.zip"]
-            + self.files_to_create["movie.mov"]
-            + self.files_to_create["temp.tmp"]
+            self.files_to_create["archive.zip"] + self.files_to_create["movie.mov"] + self.files_to_create["temp.tmp"]
         )  # 300 + 1000 + 50 = 1350
         self.assertEqual(state.total_deleted_size, expected_deleted_size)
 

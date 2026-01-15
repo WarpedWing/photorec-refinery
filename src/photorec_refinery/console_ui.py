@@ -76,9 +76,7 @@ def print_intro(output_dir):
     print(f"{f'{BOLD}PhotoRec Cleaner v0.2{RESET}':^{BOX_WIDTH + 10}}")
     print(f"{'=' * (BOX_WIDTH + 2)}")
     print(f"  Output directory: {GREEN}{Path(output_dir).resolve()}{RESET}")
-    print(
-        f"  Press {BLUE}'y' + Enter{RESET} when PhotoRec is done to finish cleaning.\n"
-    )
+    print(f"  Press {BLUE}'y' + Enter{RESET} when PhotoRec is done to finish cleaning.\n")
 
 
 def print_status_live(state):

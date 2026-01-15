@@ -26,18 +26,14 @@ class TestCleaner(unittest.TestCase):
 
     @patch("src.photorec_refinery.photorec_refinery.clean_folder")
     @patch("src.photorec_refinery.photorec_refinery.get_recup_dirs")
-    def test_run_once_with_multiple_folders(
-        self, mock_get_recup_dirs, mock_clean_folder
-    ):
+    def test_run_once_with_multiple_folders(self, mock_get_recup_dirs, mock_clean_folder):
         """
         Test the core logic of run_once with a mix of cleaned, uncleaned, and active folders.
         """
         # --- Arrange ---
         dir1, dir2, dir3 = "/fake/d1", "/fake/d2", "/fake/d3"
         mock_get_recup_dirs.return_value = [dir1, dir2, dir3]
-        self.app_state.cleaned_folders.add(
-            dir1
-        )  # Simulate that dir1 is already cleaned
+        self.app_state.cleaned_folders.add(dir1)  # Simulate that dir1 is already cleaned
 
         mock_logger = MagicMock()
 
@@ -50,9 +46,7 @@ class TestCleaner(unittest.TestCase):
         self.assertEqual(mock_clean_folder.call_args[0][0], dir2)
 
         # Verify logger calls
-        self.assertIn(
-            f"Processing {dir2}", [call[0][0] for call in mock_logger.call_args_list]
-        )
+        self.assertIn(f"Processing {dir2}", [call[0][0] for call in mock_logger.call_args_list])
         self.assertIn(
             "Processing folder: d3",
             [call[0][0] for call in mock_logger.call_args_list],
