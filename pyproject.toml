@@ -121,6 +121,11 @@ requires = [
     "toga-gtk>=0.5.3",
 ]
 
+[tool.briefcase.app.photorec-refinery.linux.flatpak]
+flatpak_runtime = "org.gnome.Platform"
+flatpak_runtime_version = "47"
+flatpak_sdk = "org.gnome.Sdk"
+
 [tool.briefcase.app.photorec-refinery.windows]
 requires = [
     # WinForms 0.5.x; ensure pythonnet present for CLR hosting
