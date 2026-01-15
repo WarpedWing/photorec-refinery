@@ -15,7 +15,7 @@ jobs:
             artifact_path: dist/*.dmg
           - os: ubuntu-22.04
             platform: linux
-            artifact_path: dist/*.deb
+            artifact_path: dist/*.AppImage
           - os: windows-latest
             platform: windows
             artifact_path: dist/*.msi
@@ -41,18 +41,34 @@ jobs:
             libpango1.0-dev \
             libwebkit2gtk-4.1-dev \
             gir1.2-gtk-3.0 \
-            gir1.2-webkit2-4.1
+            gir1.2-webkit2-4.1 \
+            libfuse2
 
       - name: Install Briefcase
         run: pip install briefcase
 
-      - name: Create app
+      - name: Create app (Linux AppImage)
+        if: matrix.platform == 'linux'
+        run: briefcase create linux appimage
+
+      - name: Create app (other platforms)
+        if: matrix.platform != 'linux'
         run: briefcase create
 
-      - name: Build app
+      - name: Build app (Linux AppImage)
+        if: matrix.platform == 'linux'
+        run: briefcase build linux appimage
+
+      - name: Build app (other platforms)
+        if: matrix.platform != 'linux'
         run: briefcase build
 
-      - name: Package app
+      - name: Package app (Linux AppImage)
+        if: matrix.platform == 'linux'
+        run: briefcase package linux appimage
+
+      - name: Package app (other platforms)
+        if: matrix.platform != 'linux'
         run: briefcase package --adhoc-sign
 
       - name: Upload artifact
