@@ -81,7 +81,7 @@ sudo apt install flatpak
 flatpak install PhotoRec-Refinery-X.X.X.flatpak
 
 # Run the app
-flatpak run com.photorec-refinery.photorec-refinery
+flatpak run com.warpedwinglabs.photorec-refinery
 ```
 
 Alternatively, on systems with GTK3 and Python 3.13+, you can run from source (see below).

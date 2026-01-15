@@ -88,7 +88,7 @@ dev = [
 
 [tool.briefcase]
 project_name = "PhotoRec Refinery"
-bundle = "com.photorec-refinery"
+bundle = "com.warpedwinglabs.photorec-refinery"
 version = "1.0.1"
 url = "https://github.com/WarpedWing/photorec-refinery"
 author = "WarpedWing Labs"
