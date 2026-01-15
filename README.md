@@ -8,9 +8,9 @@ A desktop companion for [PhotoRec](https://www.cgsecurity.org/wiki/PhotoRec) tha
 - One‑click “Process” for existing PhotoRec output that’s already finished
 - Optional reorganization into type‑based folders with configurable subfolder batch sizes
 
-| From This    | To This |
+| From This | To This |
 | -------- | ------- |
-| ![PhotRec Refinery - Ugly Folders](https://github.com/WarpedWing/WarpedWing/blob/main/refinery-uglyfolders.png)  | ![PhotRec Refinery - Reorganized Folders](https://github.com/WarpedWing/WarpedWing/blob/main/refinery-cleanfolders.png)    |
+| ![PhotRec Refinery - Ugly Folders](https://github.com/WarpedWing/WarpedWing/blob/main/refinery-uglyfolders.png) | ![PhotRec Refinery - Reorganized Folders](https://github.com/WarpedWing/WarpedWing/blob/main/refinery-cleanfolders.png) |
 
 ## Why This Helps
 
@@ -66,7 +66,7 @@ If you prefer to run the app from source:
 
 #### Requirements
 
-- Python 3.10+
+- Python 3.13+
 - [UV](https://docs.astral.sh/uv/) (recommended) or pip
 
 #### Installation with UV
@@ -131,7 +131,7 @@ photorec-refinery-gui
 
 ## Building from Source
 
-To build the application yourself (requires Python 3.10+):
+To build the application yourself (requires Python 3.13+):
 
 ```bash
 # Install UV

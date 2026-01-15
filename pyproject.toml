@@ -1,11 +1,10 @@
 [project]
 name = "photorec-refinery"
-version = "1.0.0"
+version = "1.0.1"
 description = "A tool to clean and organize PhotoRec output directories."
-requires-python = ">=3.10"
+requires-python = ">=3.13"
 dependencies = [
-    # Target Toga 0.5.x APIs across platforms
-    "toga>=0.5.2",
+    "toga>=0.5.3",
 ]
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -14,6 +13,7 @@ license = { file = "LICENSE" }
 photorec-refinery-gui = "photorec_refinery.gui:main"
 
 [tool.ruff]
+line-length = 120
 [tool.ruff.lint]
 select = [
   "E",        
@@ -48,12 +48,42 @@ extend-select = [
 
 ignore = [
     "B011",
-    "E501"
+    "E501",
+    "TD003",
+    "RET504",
 ]
+
+[tool.basedpyright]
+include = ["src/photorec_refinery"]
+# Excluding pandas false errors
+exclude = [
+    "**/__pycache__",
+]
+
+# "off" | "basic" | "standard" | "strict"
+typeCheckingMode = "basic"  
+
+reportGeneralTypeIssues = "error"
+reportOptionalMemberAccess = "error"
+reportOptionalSubscript = "error"
+reportOptionalCall = "error"
+
+reportMissingTypeStubs = "none"
+reportUnknownMemberType = "none"
+reportUnknownVariableType = "none"
+reportUnknownArgumentType = "none"
+reportUnknownParameterType = "none"
+reportUnknownLambdaType = "none"
+reportUnusedVariable = false
+
+reportUnusedImport = "warning"
+reportUnusedFunction = "none"
+reportPrivateUsage = "none"
 
 [dependency-groups]
 dev = [
-    "briefcase>=0.3.19",
+    "briefcase>=0.3.26",
+    "ruff>=0.14.11",
 ]
 
 [tool.briefcase]
@@ -78,24 +108,23 @@ test_sources = ["tests"]
 startup_module = "photorec_refinery.gui"
 
 requires = [
-    # Keep core Toga aligned on 0.5.x across platforms
-    "toga>=0.5.2",
+    "toga>=0.5.3",
 ]
 
 [tool.briefcase.app.photorec-refinery.macOS]
 requires = [
-    "toga-cocoa>=0.5.2",
+    "toga-cocoa>=0.5.3",
 ]
 
 [tool.briefcase.app.photorec-refinery.linux]
 requires = [
-    "toga-gtk>=0.5.2",
+    "toga-gtk>=0.5.3",
 ]
 
 [tool.briefcase.app.photorec-refinery.windows]
 requires = [
     # WinForms 0.5.x; ensure pythonnet present for CLR hosting
-    "toga-winforms>=0.5.2",
-    "pythonnet>=3.0.1",
+    "toga-winforms>=0.5.3",
+    "pythonnet>=3.0.5",
 ]
 system_installer = true
