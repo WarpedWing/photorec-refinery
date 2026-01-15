@@ -89,7 +89,7 @@ dev = [
 [tool.briefcase]
 project_name = "PhotoRec Refinery"
 bundle = "com.photorec-refinery"
-version = "1.0.0"
+version = "1.0.1"
 url = "https://github.com/WarpedWing/photorec-refinery"
 author = "WarpedWing Labs"
 author_email = "noel@warpedwinglabs.com"
