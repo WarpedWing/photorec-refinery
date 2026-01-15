@@ -86,7 +86,7 @@ class PhotoRecCleanerApp(toga.App):
         photorec_cleaner_logo = toga.Image("resources/WarpedWingLabs_Logo_800x300.png")
 
         header_box = toga.Box(style=Pack(direction="row", margin=5, flex=1))
-        header_box.add(toga.ImageView(photorec_cleaner_logo, height=100, margin_bottom=0))
+        header_box.add(toga.ImageView(photorec_cleaner_logo, height=100, margin=0))
 
         # Help button
         # spacer to push Help right
@@ -97,12 +97,14 @@ class PhotoRecCleanerApp(toga.App):
         # Outer box
         main_box = toga.Box(style=Pack(direction="column", flex=1))
         # Inner content wrapper
-        content_box = toga.Box(style=Pack(direction="column", flex=1, margin=12))
+        content_box = toga.Box(
+            style=Pack(direction="column", flex=1, margin_left=12, margin_right=12, margin_bottom=15, margin_top=5)
+        )
         content_box.add(header_box)
         content_box.add(toga.Divider(margin_bottom=10))
 
         # Directory selection
-        dir_box = toga.Box(style=Pack(margin_bottom=10))
+        dir_box = toga.Box(style=Pack(margin_bottom=10, margin_top=10))
         dir_label = toga.Label("PhotoRec Output Directory:", style=Pack(margin_right=10))
         # Show truncated path; store full separately
         self._updating_dir_field = False
@@ -202,7 +204,7 @@ class PhotoRecCleanerApp(toga.App):
         self.progress_bar.style.visibility = "hidden"
         content_box.add(self.progress_bar)
 
-        content_box.add(toga.Divider(margin_top=20, margin_bottom=10))
+        content_box.add(toga.Divider(margin_top=20, margin_bottom=20))
 
         # Status area (one label)
         status_box = toga.Box(
@@ -244,16 +246,17 @@ class PhotoRecCleanerApp(toga.App):
         scroll_container = toga.ScrollContainer(content=status_box, horizontal=False, vertical=True)
 
         content_box.add(scroll_container)
-        content_box.add(toga.Divider(margin_top=10, margin_bottom=10))
+        content_box.add(toga.Divider(margin_top=10))
 
         # Action buttons
-        action_box = toga.Box(style=Pack(margin_top=10, flex=1, align_items="end", margin_bottom=10))
+        action_box = toga.Box(style=Pack(margin_top=10, flex=1, align_items="center", margin_bottom=15))
         self.cancel_button = toga.Button(
             "Cancel",
             on_press=self.cancel_handler,
             enabled=False,
             flex=1,
-            margin=5,
+            margin_right=5,
+            margin_left=0,
             font_weight="bold",
             font_size=10,
             height=30,
@@ -263,7 +266,8 @@ class PhotoRecCleanerApp(toga.App):
             on_press=self.start_monitoring_handler,
             enabled=False,
             flex=1,
-            margin=5,
+            margin_left=5,
+            margin_right=5,
             font_weight="bold",
             font_size=10,
             height=30,
@@ -273,7 +277,8 @@ class PhotoRecCleanerApp(toga.App):
             on_press=self._process_or_finalize_handler,
             enabled=False,
             flex=1,
-            margin=5,
+            margin_left=5,
+            margin_right=0,
             font_weight="bold",
             font_size=10,
             height=30,
@@ -384,7 +389,7 @@ class PhotoRecCleanerApp(toga.App):
             return
         self._updating_dir_field = True
         try:
-            self.dir_path_input.value = tail_truncate(self._dir_path_full, maxlen=80)
+            self.dir_path_input.value = tail_truncate(self._dir_path_full, maxlen=50)
         finally:
             self._updating_dir_field = False
 
@@ -394,7 +399,7 @@ class PhotoRecCleanerApp(toga.App):
             return
         self._updating_log_field = True
         try:
-            self.log_path_input.value = tail_truncate(self._log_path_full, maxlen=80)
+            self.log_path_input.value = tail_truncate(self._log_path_full, maxlen=50)
         finally:
             self._updating_log_field = False
 
